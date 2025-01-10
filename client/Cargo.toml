@@ -1,0 +1,13 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+argh = "0.1.13"
+bevy = { version = "0.15.1", features = ["bevy_remote"] }
+bevy_dev_tools = "0.15.1"
+bevy_simple_text_input = "0.10.1"
+clap = { version = "4.5.26", features = ["derive"] }
+tokio = { version = "1.43.0", features = ["full"] }
