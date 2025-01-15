@@ -380,12 +380,10 @@ fn check_response_to_join(
         InboundEvent::RequestJoinAccepted => {
             commands.send_event(LogEvent::Push(Message::success("joined the lobby")));
             state.set(JoiningServerState::Joined);
-            return;
         }
         InboundEvent::Error(e) => {
             commands.send_event(LogEvent::Push(Message::error(e)));
             state.set(JoiningServerState::Failed);
-            return;
         }
         unexp => {
             panic!("unexpected response to RequestJoin: {:?}", unexp);
