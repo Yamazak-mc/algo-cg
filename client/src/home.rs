@@ -1,16 +1,20 @@
-use std::net::{IpAddr, Ipv4Addr};
-
-use crate::{spawn_common_button, AppState, ServerPort};
+use crate::{spawn_common_button, AppArgs, AppState};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy_dev_tools::states::log_transitions;
 use bevy_simple_text_input::{
     TextInput, TextInputInactive, TextInputPlaceholder, TextInputSettings, TextInputTextColor,
     TextInputTextFont, TextInputValue,
 };
 use client::{
-    button::{is_button_pressed, QueryButtonClick},
-    client::{client_connection_plugin, spawn_client, ConnectionResult},
+    button::is_button_pressed,
+    client::{
+        client_connection_plugin, spawn_client, CancelSpawnClientEvent, InboundEvent,
+        OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
+    },
+    log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
     util::IntoColor as _,
 };
+use std::net::IpAddr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
 #[source(AppState = AppState::Home)]
@@ -18,7 +22,35 @@ enum HomeState {
     #[default]
     Menu,
     JoiningServer,
-    FailedToJoinServer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
+#[source(HomeState = HomeState::JoiningServer)]
+enum JoiningServerState {
+    #[default]
+    Setup,
+    Connecting,
+    Cancelling,
+    Failed,
+    Joining,
+    Joined,
+}
+
+impl JoiningServerState {
+    fn connected(&self) -> bool {
+        matches!(self, Self::Joining | Self::Joined)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ConnectedToServer;
+
+impl ComputedStates for ConnectedToServer {
+    type SourceStates = JoiningServerState;
+
+    fn compute(source: Self::SourceStates) -> Option<Self> {
+        source.connected().then_some(Self)
+    }
 }
 
 // TODO: use CONSTs instead of magic numbers for UI
@@ -28,8 +60,12 @@ const POPUP_BG_COLOR_RGBA: [u8; 4] = [43, 43, 43, 240];
 pub fn home_plugin(app: &mut App) {
     app.add_plugins(client_connection_plugin)
         .add_sub_state::<HomeState>()
+        .add_sub_state::<JoiningServerState>()
+        .add_computed_state::<ConnectedToServer>()
         .enable_state_scoped_entities::<HomeState>()
-        .add_systems(Update, bevy_dev_tools::states::log_transitions::<HomeState>) // DEBUG
+        .add_systems(Update, log_transitions::<HomeState>) // DEBUG
+        .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
+        .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(Update, focus_text_input.run_if(in_state(HomeState::Menu)))
         .add_systems(
@@ -47,17 +83,38 @@ pub fn home_plugin(app: &mut App) {
             unfocus_text_input
                 .run_if(in_state(HomeState::Menu).and(input_just_pressed(MouseButton::Left))),
         )
-        .add_systems(OnEnter(HomeState::JoiningServer), setup_join_server)
+        .add_systems(OnEnter(HomeState::JoiningServer), setup_join_server_ui)
+        .add_systems(OnEnter(JoiningServerState::Setup), setup_join_server)
         .add_systems(
             Update,
-            wait_for_connection.run_if(in_state(HomeState::JoiningServer)),
+            wait_for_connection.run_if(in_state(JoiningServerState::Connecting)),
         )
-        .add_systems(OnEnter(HomeState::FailedToJoinServer), setup_error_popup)
         .add_systems(
             Update,
-            on_click_close_popup_button.run_if(
-                in_state(HomeState::FailedToJoinServer).and(is_button_pressed::<ClosePopupButton>),
+            on_click_cancel_conn_button.run_if(
+                in_state(JoiningServerState::Connecting).and(is_button_pressed::<ClosePopupButton>),
             ),
+        )
+        .add_systems(
+            Update,
+            check_response_to_join
+                .run_if(in_state(JoiningServerState::Joining).and(on_event::<ReceivedResponse>)),
+        )
+        .add_systems(
+            Update,
+            wait_for_client_to_shutdown.run_if(in_state(JoiningServerState::Cancelling)),
+        )
+        .add_systems(OnEnter(JoiningServerState::Failed), modify_button_text)
+        .add_systems(
+            Update,
+            on_click_acknowledge_conn_failure.run_if(
+                in_state(JoiningServerState::Failed).and(is_button_pressed::<ClosePopupButton>),
+            ),
+        )
+        .add_systems(
+            Update,
+            check_if_disconnected
+                .run_if(in_state(ConnectedToServer).and(on_event::<ReceivedRequest>)),
         );
 }
 
@@ -71,9 +128,14 @@ struct IpAddrTextInput;
 struct JoinServerButton;
 
 #[derive(Component)]
+struct ClosePopupButton;
+
+#[derive(Component)]
 struct QuitButton;
 
-fn setup_home(mut commands: Commands) {
+fn setup_home(mut commands: Commands, args: Res<AppArgs>) {
+    let server_ip_text = args.server_ip.clone().unwrap_or_default();
+
     commands
         .spawn((
             HomeWidget,
@@ -110,6 +172,7 @@ fn setup_home(mut commands: Commands) {
                         BorderColor(Color::srgb_u8(200, 200, 200)),
                         BackgroundColor(Color::srgb_u8(200, 200, 200)),
                         TextInput,
+                        TextInputValue(server_ip_text),
                         TextInputSettings {
                             retain_on_submit: true,
                             ..default()
@@ -165,71 +228,24 @@ fn on_click_quit_button(mut commands: Commands) {
     commands.send_event(bevy::app::AppExit::Success);
 }
 
-fn on_click_join_server_button(
-    // mut app_state: ResMut<NextState<AppState>>,
-    mut commands: Commands,
-    mut home_state: ResMut<NextState<HomeState>>,
-    addr_input_value: Query<&TextInputValue, With<IpAddrTextInput>>,
-) {
-    fn parse_ip_v4_addr(addr: &str) -> anyhow::Result<Ipv4Addr> {
-        use anyhow::Context;
-
-        match addr.parse() {
-            Ok(IpAddr::V4(v4_addr)) => Ok(v4_addr),
-            Ok(IpAddr::V6(v6_addr)) => v6_addr
-                .to_ipv4()
-                .context("given address is not IPv4-compatible"),
-            Err(e) => Err(e.into()),
-        }
-    }
-    let v4_addr = match parse_ip_v4_addr(&addr_input_value.single().0) {
-        Ok(v) => v,
-        Err(e) => {
-            commands.spawn((
-                StateScoped(HomeState::FailedToJoinServer),
-                JoinServerError(e.into()),
-            ));
-            home_state.set(HomeState::FailedToJoinServer);
-            return;
-        }
-    };
-
-    commands.spawn((
-        StateScoped(HomeState::JoiningServer),
-        JoinServerAttempt { addr: v4_addr },
-    ));
+fn on_click_join_server_button(mut home_state: ResMut<NextState<HomeState>>) {
     home_state.set(HomeState::JoiningServer);
 }
 
-fn popup_root_node() -> Node {
-    Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(POPUP_HEIGHT_PERCENT),
-        align_self: AlignSelf::Center,
-        justify_self: JustifySelf::Center,
-        ..default()
-    }
-}
-
-fn popup_bg_color() -> BackgroundColor {
-    BackgroundColor(POPUP_BG_COLOR_RGBA.into_color())
-}
-
-#[derive(Component)]
-struct JoinServerError(Box<dyn std::error::Error + Send + Sync + 'static>);
-
-fn setup_error_popup(mut commands: Commands, err: Query<&JoinServerError>) {
-    let err_msg = err.single().0.to_string();
-
+fn setup_join_server_ui(mut commands: Commands) {
     commands
         .spawn((
-            StateScoped(HomeState::FailedToJoinServer),
+            StateScoped(HomeState::JoiningServer),
             Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(POPUP_HEIGHT_PERCENT),
+                align_self: AlignSelf::Center,
+                justify_self: JustifySelf::Center,
                 display: Display::Flex,
                 flex_direction: FlexDirection::Column,
-                ..popup_root_node()
+                ..default()
             },
-            popup_bg_color(),
+            BackgroundColor(POPUP_BG_COLOR_RGBA.into_color()),
         ))
         .with_children(|parent| {
             parent
@@ -239,10 +255,10 @@ fn setup_error_popup(mut commands: Commands, err: Query<&JoinServerError>) {
                     ..default()
                 })
                 .with_children(|parent| {
-                    parent.spawn((
-                        Text(format!("Failed to join server :(\n{}", err_msg)),
-                        TextColor(Color::srgb_u8(255, 0, 0)),
-                    ));
+                    parent.spawn(LogDisplay::new(LogDisplaySettings {
+                        max_lines: 20,
+                        font: TextFont::default(),
+                    }));
                 });
 
             parent
@@ -254,59 +270,159 @@ fn setup_error_popup(mut commands: Commands, err: Query<&JoinServerError>) {
                     ..default()
                 })
                 .with_children(|parent| {
-                    spawn_common_button(parent, "OK", ClosePopupButton);
+                    spawn_common_button(parent, "Cancel", ClosePopupButton);
                 });
         });
 }
 
-#[derive(Component)]
-struct ClosePopupButton;
+fn setup_join_server(
+    mut commands: Commands,
+    addr_input_value: Single<&TextInputValue, With<IpAddrTextInput>>,
+    mut state: ResMut<NextState<JoiningServerState>>,
+    app_args: Res<AppArgs>,
+) {
+    // Parse IP Address
+    let addr: IpAddr = match addr_input_value.0.parse() {
+        Ok(v) => v,
+        Err(e) => {
+            commands.send_event(LogEvent::Push(Message::error(e.to_string())));
+            state.set(JoiningServerState::Failed);
+            return;
+        }
+    };
 
-fn on_click_close_popup_button(mut home_state: ResMut<NextState<HomeState>>) {
+    commands.send_event(LogEvent::Push(Message::from_text(format!(
+        "joining the server...\nIP address: {}",
+        addr
+    ))));
+
+    spawn_client(&mut commands, addr, app_args.server_port);
+    state.set(JoiningServerState::Connecting);
+}
+
+fn wait_for_connection(
+    mut commands: Commands,
+    mut reader: EventReader<SpawnClientResult>,
+    mut state: ResMut<NextState<JoiningServerState>>,
+    ev_handler: Option<ResMut<client::EventHandler>>,
+) {
+    if reader.is_empty() {
+        return;
+    }
+    let res = reader.read().next().unwrap();
+
+    match res.0 {
+        Ok(_) => {
+            // Connection is established.
+            commands.send_event(LogEvent::Push(Message::success("connected to the server")));
+
+            // Now send Join request to the server.
+            let id = ev_handler
+                .expect("event handler should be available at this point")
+                .send(OutboundEvent::RequestJoin)
+                .expect("send never fails");
+            commands.spawn((
+                StateScoped(JoiningServerState::Joining),
+                JoinRequestEventId(id),
+            ));
+
+            state.set(JoiningServerState::Joining);
+        }
+        Err(ref err_msg) => {
+            // Connection is failed.
+            commands.send_event(LogEvent::Push(Message::error(format!(
+                "failed to join the server :(\n{}",
+                err_msg
+            ))));
+
+            state.set(JoiningServerState::Failed);
+        }
+    }
+
+    reader.clear();
+}
+
+#[derive(Component)]
+struct JoinRequestEventId(protocol::EventId);
+
+fn wait_for_client_to_shutdown(
+    mut reader: EventReader<SpawnClientResult>,
+    mut home_state: ResMut<NextState<HomeState>>,
+) {
+    if reader.is_empty() {
+        return;
+    }
+
+    let res = reader.read().next().unwrap();
+    info!("connection is cancelled: res={:?}", res);
+
+    home_state.set(HomeState::Menu);
+}
+
+#[allow(clippy::never_loop)]
+fn check_response_to_join(
+    mut commands: Commands,
+    ev_id: Single<&JoinRequestEventId>,
+    mut responses: EventReader<ReceivedResponse>,
+    mut ev_handler: ResMut<client::EventHandler>,
+    mut state: ResMut<NextState<JoiningServerState>>,
+) {
+    let ev_id = ev_id.0;
+    if !responses.read().any(|ev| ev.id() == ev_id) {
+        return;
+    }
+
+    let response = ev_handler
+        .get_response(ev_id)
+        .expect("response should be available");
+
+    match response {
+        InboundEvent::RequestJoinAccepted => {
+            commands.send_event(LogEvent::Push(Message::success("joined the lobby")));
+            state.set(JoiningServerState::Joined);
+            return;
+        }
+        InboundEvent::Error(e) => {
+            commands.send_event(LogEvent::Push(Message::error(e)));
+            state.set(JoiningServerState::Failed);
+            return;
+        }
+        unexp => {
+            panic!("unexpected response to RequestJoin: {:?}", unexp);
+        }
+    }
+}
+
+fn on_click_cancel_conn_button(
+    mut commands: Commands,
+    mut state: ResMut<NextState<JoiningServerState>>,
+) {
+    commands.send_event(LogEvent::Push(Message::warn(
+        "cancelling the connection...",
+    )));
+    commands.send_event(CancelSpawnClientEvent);
+    state.set(JoiningServerState::Cancelling);
+}
+
+fn on_click_acknowledge_conn_failure(mut home_state: ResMut<NextState<HomeState>>) {
     // Go back to home menu
     home_state.set(HomeState::Menu);
 }
 
-fn setup_join_server(
-    attempt: Query<&JoinServerAttempt>,
-    port: Res<ServerPort>,
+fn modify_button_text(mut commands: Commands, children: Single<&Children, With<ClosePopupButton>>) {
+    commands.entity(children[0]).insert(Text::new("Go Back"));
+}
+
+fn check_if_disconnected(
+    mut evr: EventReader<ReceivedRequest>,
+    mut ev_handler: ResMut<client::EventHandler>,
+    mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
 ) {
-    let addr = attempt.single().addr;
-    let port = port.0;
-
-    let text = format!("Joining server...\nIP: {}", addr);
-
-    commands
-        .spawn((
-            StateScoped(HomeState::JoiningServer),
-            popup_root_node(),
-            popup_bg_color(),
-        ))
-        .with_children(|parent| {
-            parent.spawn(Text(text));
-        });
-
-    spawn_client(&mut commands, addr.into(), port);
-}
-
-#[derive(Component)]
-struct JoinServerAttempt {
-    addr: Ipv4Addr,
-}
-
-fn wait_for_connection(mut res: EventReader<ConnectionResult>) {
-    if res.is_empty() {
-        return;
-    }
-    let res = res.read().next().unwrap();
-
-    match res.0 {
-        Ok(_) => {
-            info!("Connection suceeded!");
-        }
-        Err(ref e) => {
-            error!("Connection failed!\n{}", e);
+    for req in evr.read() {
+        if let Some(InboundEvent::ServerShutdown) = ev_handler.get_request(req.id()) {
+            commands.send_event(LogEvent::Push(Message::error("disconnected")));
+            state.set(JoiningServerState::Failed);
         }
     }
 }

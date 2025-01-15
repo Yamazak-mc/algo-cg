@@ -1,15 +1,22 @@
-#![allow(unused)]
-#![warn(unused_mut, unused_must_use)]
+#![allow(clippy::type_complexity)]
+
+// #![allow(unused)]
+// #![warn(unused_mut, unused_must_use)]
 
 use bevy::prelude::*;
 use bevy_simple_text_input::TextInputPlugin;
+use client::log_display::log_display_plugin;
 
 mod home;
 mod lobby;
 
-/// Arguments for launching client.
-#[derive(argh::FromArgs)]
-struct Args {
+/// Arguments for launching client app.
+#[derive(argh::FromArgs, Debug, Resource)]
+struct AppArgs {
+    /// server IP address
+    #[argh(option)]
+    server_ip: Option<String>,
+
     /// server port number
     #[argh(option, default = "client::DEFAULT_SERVER_PORT")]
     server_port: u16,
@@ -21,16 +28,14 @@ enum AppState {
     Lobby,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Resource)]
-struct ServerPort(u16);
-
 fn main() {
-    let args: Args = argh::from_env();
+    let args: AppArgs = argh::from_env();
 
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(TextInputPlugin)
-        .insert_resource(ServerPort(args.server_port))
+        .add_plugins(log_display_plugin)
+        .insert_resource(args)
         .insert_state(AppState::Home)
         .enable_state_scoped_entities::<AppState>()
         .add_systems(Update, bevy_dev_tools::states::log_transitions::<AppState>) // DEBUG

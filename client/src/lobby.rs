@@ -1,6 +1,7 @@
 use super::AppState;
 use bevy::prelude::*;
 
+#[allow(unused)]
 enum LobbyState {}
 
 pub fn lobby_plugin(app: &mut App) {
