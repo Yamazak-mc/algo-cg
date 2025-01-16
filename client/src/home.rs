@@ -319,8 +319,8 @@ fn wait_for_connection(
             // Now send Join request to the server.
             let id = ev_handler
                 .expect("event handler should be available at this point")
-                .send(OutboundEvent::RequestJoin)
-                .expect("send never fails");
+                .send_request(OutboundEvent::RequestJoin)
+                .unwrap();
             commands.spawn((
                 StateScoped(JoiningServerState::Joining),
                 JoinRequestEventId(id),
@@ -373,7 +373,8 @@ fn check_response_to_join(
     }
 
     let response = ev_handler
-        .get_response(ev_id)
+        .storage
+        .take_response(ev_id)
         .expect("response should be available");
 
     match response {
@@ -418,7 +419,11 @@ fn check_if_disconnected(
     mut commands: Commands,
 ) {
     for req in evr.read() {
-        if let Some(InboundEvent::ServerShutdown) = ev_handler.get_request(req.id()) {
+        let id = req.id();
+        if let Some(InboundEvent::ServerShutdown) = ev_handler.storage.get_request(id) {
+            // Consume this event
+            ev_handler.storage.take_request(id);
+
             commands.send_event(LogEvent::Push(Message::error("disconnected")));
             state.set(JoiningServerState::Failed);
         }

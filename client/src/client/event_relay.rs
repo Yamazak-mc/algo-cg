@@ -1,3 +1,5 @@
+use super::{InboundEvent, OutboundEvent};
+use bevy::prelude::info;
 use protocol::WithMetadata;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -5,8 +7,6 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
-
-use super::{InboundEvent, OutboundEvent};
 
 pub struct EventRelay {
     stream: TcpStream,
@@ -41,6 +41,11 @@ impl EventRelay {
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
             tokio::select! {
+                _ = self.shutdown_token.cancelled() => {
+                    info!("received a shutdown token");
+                    break;
+                },
+
                 outbound_ev = self.out_rx.recv() => {
                     let Some(outbound_ev) = outbound_ev else {
                         // Inbound event sender is dropped.
@@ -50,15 +55,12 @@ impl EventRelay {
                     let data = bincode::serialize(&outbound_ev)?;
                     self.stream.write_all(&data).await?;
                 }
-                // n = self.stream.read(&mut self.buf) => {
-                //     self.handle_buf(n?).await?;
-                // }
+
                 readable = self.stream.readable() => {
                     readable?;
 
                     self.relay_inbound_ev().await?;
                 }
-                _ = self.shutdown_token.cancelled() => break,
             }
         }
 

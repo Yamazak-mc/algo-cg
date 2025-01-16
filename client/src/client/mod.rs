@@ -1,5 +1,4 @@
 use bevy::{prelude::*, tasks::AsyncComputeTaskPool};
-use protocol::{EventHandlerPlugin, WithMetadata};
 use std::{
     net::{IpAddr, SocketAddr},
     thread,
@@ -17,12 +16,19 @@ pub type OutboundEvent = protocol::client_to_server::ClientToServerEvent;
 mod event_relay;
 use event_relay::EventRelay;
 
+pub mod event_handler;
+
+pub type EventHandler = event_handler::EventHandler<InboundEvent, OutboundEvent>;
+pub type ReceivedRequest = event_handler::ReceivedRequest<InboundEvent>;
+pub type ReceivedResponse = event_handler::ReceivedResponse<InboundEvent>;
+
 pub fn client_connection_plugin(app: &mut App) {
-    app.add_plugins(EventHandlerPlugin::<InboundEvent, OutboundEvent>::default())
+    app.add_plugins(event_handler::EventHandlerPlugin::<
+        InboundEvent,
+        OutboundEvent,
+    >::default())
         .add_event::<SpawnClientResult>()
         .add_event::<CancelSpawnClientEvent>()
-        .add_event::<ReceivedRequest>()
-        .add_event::<ReceivedResponse>()
         .add_systems(Update, ConnectionHandle::system)
         .add_systems(Update, CancelConnTask::system);
 }
@@ -45,17 +51,8 @@ pub struct SpawnClientResult(pub Result<(), Box<str>>);
 #[derive(Event)]
 pub struct CancelSpawnClientEvent;
 
-pub type EventHandler = protocol::EventHandler<
-    mpsc::UnboundedReceiver<WithMetadata<InboundEvent>>,
-    mpsc::UnboundedSender<WithMetadata<OutboundEvent>>,
->;
-
-pub type ReceivedRequest = protocol::ReceivedRequest<InboundEvent>;
-pub type ReceivedResponse = protocol::ReceivedResponse<InboundEvent>;
-
 #[derive(Resource)]
 struct ShutdownClientOnDrop {
-    shutdown_token: CancellationToken,
     thread_handle: Option<std::thread::JoinHandle<()>>,
     /// Send signal through this to tell runtime to shutdown.
     oneshot_tx: Option<oneshot::Sender<()>>,
