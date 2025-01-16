@@ -103,7 +103,7 @@ impl Default for NextEventId {
 }
 
 impl NextEventId {
-    pub fn next(&mut self) -> EventId {
+    pub fn produce(&mut self) -> EventId {
         self.0 .0 += 1;
         self.0
     }

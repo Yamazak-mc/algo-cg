@@ -29,7 +29,7 @@ impl<I, O> EventHandler<I, O> {
         &mut self,
         event: O,
     ) -> Result<protocol::EventId, SendError<WithMetadata<O>>> {
-        let id = self.next_id.next();
+        let id = self.next_id.produce();
         self.out_tx
             .send(WithMetadata {
                 kind: EventKind::Request,
