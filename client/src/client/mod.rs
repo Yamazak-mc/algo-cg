@@ -57,6 +57,8 @@ pub type ReceivedResponse = protocol::ReceivedResponse<InboundEvent>;
 struct ShutdownClientOnDrop {
     shutdown_token: CancellationToken,
     thread_handle: Option<std::thread::JoinHandle<()>>,
+    /// Send signal through this to tell runtime to shutdown.
+    oneshot_tx: Option<oneshot::Sender<()>>,
 }
 
 impl Drop for ShutdownClientOnDrop {
@@ -68,7 +70,7 @@ impl Drop for ShutdownClientOnDrop {
 impl ShutdownClientOnDrop {
     fn shutdown(&mut self) {
         info!("shutting down the client...");
-        self.shutdown_token.cancel();
+        self.oneshot_tx.take().unwrap().send(()).ok();
         self.thread_handle.take().unwrap().join().ok();
         info!("client is shut down");
     }
@@ -89,6 +91,8 @@ fn connect(addr: IpAddr, port: u16) -> ConnectionHandleImpl {
 
     let cancel_token = shutdown_token.child_token();
     let cancel_token_cloned = cancel_token.clone();
+
+    let (oneshot_tx, oneshot_rx) = oneshot::channel();
 
     let thread_handle = thread::spawn(move || {
         // MAYBE: handle panics?
@@ -112,18 +116,20 @@ fn connect(addr: IpAddr, port: u16) -> ConnectionHandleImpl {
                     return Err(e.into());
                 }
             };
+            let mut event_relay = EventRelay::new(stream, out_rx, in_tx, shutdown_token_cloned);
 
-            EventRelay::new(stream, out_rx, in_tx, shutdown_token_cloned)
-                .run()
-                .await
+            tokio::select! {
+                ret = event_relay.run() => ret,
+                _ = oneshot_rx => Err(anyhow::anyhow!("interrupted")),
+            }
         })
         .ok(); // FIXME: Not ok
     });
 
     let ev_handler = EventHandler::new(in_rx, out_tx);
     let shutdown_handler = ShutdownClientOnDrop {
-        shutdown_token,
         thread_handle: Some(thread_handle),
+        oneshot_tx: Some(oneshot_tx),
     };
 
     ConnectionHandleImpl {
