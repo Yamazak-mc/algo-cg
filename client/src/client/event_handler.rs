@@ -20,7 +20,7 @@ impl<I, O> EventHandler<I, O> {
         Self {
             in_rx,
             out_tx,
-            storage: EventBox::new(),
+            storage: EventBox::default(),
             next_id: NextEventId::default(),
         }
     }

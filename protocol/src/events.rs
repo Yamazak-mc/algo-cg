@@ -47,15 +47,16 @@ pub struct EventBox<E> {
     responses: BTreeMap<EventId, E>,
 }
 
-impl<E> EventBox<E> {
-    /// Returns a new empty storage.
-    pub fn new() -> Self {
+impl<E> Default for EventBox<E> {
+    fn default() -> Self {
         Self {
             requests: BTreeMap::new(),
             responses: BTreeMap::new(),
         }
     }
+}
 
+impl<E> EventBox<E> {
     /// Marks that the user has sent a request with the specified ID
     /// and is waiting for the corresponding response from the peer.
     pub fn expect_response(&mut self, _id: EventId) {
