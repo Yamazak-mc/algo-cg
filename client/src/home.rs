@@ -362,15 +362,19 @@ fn wait_for_client_to_shutdown(
 #[allow(clippy::never_loop)]
 fn check_response_to_join(
     mut commands: Commands,
-    ev_id: Single<&JoinRequestEventId>,
+    query: Single<(Entity, &JoinRequestEventId)>,
     mut responses: EventReader<ReceivedResponse>,
     mut ev_handler: ResMut<client::EventHandler>,
     mut state: ResMut<NextState<JoiningServerState>>,
 ) {
+    let (entity, ev_id) = *query;
     let ev_id = ev_id.0;
+
     if !responses.read().any(|ev| ev.id() == ev_id) {
         return;
     }
+
+    commands.entity(entity).despawn();
 
     let response = ev_handler
         .storage
