@@ -1,6 +1,6 @@
 use crate::{spawn_common_button, AppArgs, AppState};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
-use bevy_dev_tools::states::log_transitions;
+// use bevy_dev_tools::states::log_transitions;
 use bevy_simple_text_input::{
     TextInput, TextInputInactive, TextInputPlaceholder, TextInputSettings, TextInputTextColor,
     TextInputTextFont, TextInputValue,
@@ -63,9 +63,9 @@ pub fn home_plugin(app: &mut App) {
         .add_sub_state::<JoiningServerState>()
         .add_computed_state::<ConnectedToServer>()
         .enable_state_scoped_entities::<HomeState>()
-        .add_systems(Update, log_transitions::<HomeState>) // DEBUG
-        .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
-        .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
+        // .add_systems(Update, log_transitions::<HomeState>) // DEBUG
+        // .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
+        // .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(Update, focus_text_input.run_if(in_state(HomeState::Menu)))
         .add_systems(
