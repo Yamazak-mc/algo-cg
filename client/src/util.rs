@@ -19,3 +19,9 @@ impl IntoColor for [u8; 4] {
         Color::srgba_u8(r, g, b, a)
     }
 }
+
+impl IntoColor for Color {
+    fn into_color(self) -> Color {
+        self
+    }
+}
