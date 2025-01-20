@@ -1,11 +1,9 @@
 use super::{InboundEvent, OutboundEvent};
+use async_write_bincode::AsyncWriteSerdeBincode as _;
+use anyhow::bail;
 use bevy::prelude::info;
 use protocol::WithMetadata;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    sync::mpsc,
-};
+use tokio::{io::AsyncReadExt, net::TcpStream, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 
 pub struct EventRelay {
@@ -51,9 +49,7 @@ impl EventRelay {
                         // Inbound event sender is dropped.
                         break;
                     };
-
-                    let data = bincode::serialize(&outbound_ev)?;
-                    self.stream.write_all(&data).await?;
+                    self.stream.write_bincode(&outbound_ev).await?;
                 }
 
                 readable = self.stream.readable() => {
@@ -68,15 +64,17 @@ impl EventRelay {
     }
 
     async fn relay_inbound_ev(&mut self) -> anyhow::Result<()> {
-        let inbound_ev = match self.stream.read(&mut self.buf).await {
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                return Ok(());
+        match self.stream.read(&mut self.buf).await {
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(()),
+            Err(_) | Ok(0) => {
+                self.in_tx.send(INTERNAL_DISCONNECTED_EV)?;
+                bail!("disconnected from the server");
             }
-            Err(_) | Ok(0) => INTERNAL_DISCONNECTED_EV,
-            Ok(n) => bincode::deserialize(&self.buf[0..n])?,
-        };
-
-        self.in_tx.send(inbound_ev)?;
-        Ok(())
+            Ok(n) => {
+                let inbound_ev = bincode::deserialize(&self.buf[0..n])?;
+                self.in_tx.send(inbound_ev)?;
+                Ok(())
+            }
+        }
     }
 }
