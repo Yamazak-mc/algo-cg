@@ -110,8 +110,9 @@ pub type ReceivedResponse<E> = ReceivedEvent<EventKindResponse, E>;
 
 fn recv_inbound_events<I, O>(
     mut ev_handler: ResMut<EventHandler<I, O>>,
-    mut request_w: EventWriter<ReceivedRequest<I>>,
-    mut response_w: EventWriter<ReceivedResponse<I>>,
+    // mut request_w: EventWriter<ReceivedRequest<I>>,
+    // mut response_w: EventWriter<ReceivedResponse<I>>,
+    mut commands: Commands,
 ) where
     I: Send + Sync + 'static + std::fmt::Debug,
     O: Send + Sync + 'static,
@@ -127,10 +128,12 @@ fn recv_inbound_events<I, O>(
 
     match kind {
         EventKind::Request => {
-            request_w.send(id.into());
+            // request_w.send(id.into());
+            commands.trigger(ReceivedRequest::<I>::from(id));
         }
         EventKind::Response => {
-            response_w.send(id.into());
+            // response_w.send(id.into());
+            commands.trigger(ReceivedResponse::<I>::from(id));
         }
     }
 }

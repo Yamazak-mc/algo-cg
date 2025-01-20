@@ -1,6 +1,6 @@
 use crate::{spawn_common_button, AppArgs, AppState};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
-// use bevy_dev_tools::states::log_transitions;
+use bevy_dev_tools::states::log_transitions;
 use bevy_simple_text_input::{
     TextInput, TextInputInactive, TextInputPlaceholder, TextInputSettings, TextInputTextColor,
     TextInputTextFont, TextInputValue,
@@ -69,7 +69,7 @@ pub fn home_plugin(app: &mut App) {
         .add_computed_state::<ConnectedToServer>()
         .enable_state_scoped_entities::<HomeState>()
         // .add_systems(Update, log_transitions::<HomeState>) // DEBUG
-        // .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
+        .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
         // .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(Update, focus_text_input.run_if(in_state(HomeState::Menu)))
@@ -102,11 +102,6 @@ pub fn home_plugin(app: &mut App) {
         )
         .add_systems(
             Update,
-            check_response_to_join
-                .run_if(in_state(JoiningServerState::Joining).and(on_event::<ReceivedResponse>)),
-        )
-        .add_systems(
-            Update,
             wait_for_client_to_shutdown.run_if(in_state(JoiningServerState::Cancelling)),
         )
         .add_systems(OnEnter(JoiningServerState::Failed), modify_button_text)
@@ -117,16 +112,13 @@ pub fn home_plugin(app: &mut App) {
             ),
         )
         .add_systems(
-            Update,
-            check_if_disconnected
-                .run_if(in_state(ConnectedToServer).and(on_event::<ReceivedRequest>)),
+            OnEnter(JoiningServerState::Joining),
+            setup_join_response_observer,
         )
+        .add_systems(OnEnter(ConnectedToServer), setup_disconnection_observer)
         .add_systems(
-            Update,
-            check_new_players.run_if(
-                in_state(JoiningServerState::WaitingForOtherPlayers)
-                    .and(on_event::<ReceivedRequest>),
-            ),
+            OnEnter(JoiningServerState::WaitingForOtherPlayers),
+            setup_new_players_observer,
         );
 }
 
@@ -382,18 +374,25 @@ fn wait_for_client_to_shutdown(
     home_state.set(HomeState::Menu);
 }
 
+fn setup_join_response_observer(mut commands: Commands) {
+    commands.spawn((
+        StateScoped(JoiningServerState::Joining),
+        Observer::new(check_response_to_join),
+    ));
+}
+
 #[allow(clippy::never_loop)]
 fn check_response_to_join(
-    mut commands: Commands,
-    query: Single<(Entity, &JoinRequestEventId)>,
-    mut responses: EventReader<ReceivedResponse>,
+    response: Trigger<ReceivedResponse>,
     mut ev_handler: ResMut<client::EventHandler>,
+    query: Single<(Entity, &JoinRequestEventId)>,
     mut state: ResMut<NextState<JoiningServerState>>,
+    mut commands: Commands,
 ) {
     let (entity, ev_id) = *query;
     let ev_id = ev_id.0;
 
-    if !responses.read().any(|ev| ev.id() == ev_id) {
+    if response.event().id() != ev_id {
         return;
     }
 
@@ -460,52 +459,66 @@ fn modify_button_text(mut commands: Commands, children: Single<&Children, With<C
     commands.entity(children[0]).insert(Text::new("Go Back"));
 }
 
+fn setup_disconnection_observer(mut commands: Commands) {
+    commands.spawn((
+        StateScoped(ConnectedToServer),
+        Observer::new(check_if_disconnected),
+    ));
+}
+
 fn check_if_disconnected(
-    mut evr: EventReader<ReceivedRequest>,
+    trigger: Trigger<ReceivedRequest>,
     mut ev_handler: ResMut<client::EventHandler>,
     mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
 ) {
-    for req in evr.read() {
-        let id = req.id();
-        if let Some(InboundEvent::ServerShutdown) = ev_handler.storage.get_request(id) {
-            // Consume this event
-            ev_handler.storage.take_request(id);
+    let id = trigger.event().id();
 
-            commands.send_event(LogEvent::Push(Message::error("disconnected")));
-            state.set(JoiningServerState::Failed);
-        }
+    info!("event triggered! id={:?}", id);
+
+    if let Some(InboundEvent::ServerShutdown) = ev_handler.storage.get_request(id) {
+        // Consume this event
+        ev_handler.storage.take_request(id);
+
+        commands.send_event(LogEvent::Push(Message::error("disconnected")));
+        state.set(JoiningServerState::Failed);
     }
 }
 
+fn setup_new_players_observer(mut commands: Commands) {
+    commands.spawn((
+        StateScoped(JoiningServerState::WaitingForOtherPlayers),
+        Observer::new(check_new_players),
+    ));
+}
+
 fn check_new_players(
-    mut evr: EventReader<ReceivedRequest>,
+    trigger: Trigger<ReceivedRequest>,
     mut ev_handler: ResMut<client::EventHandler>,
     mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
 ) {
-    for req in evr.read() {
-        let id = req.id();
-        if let Some(InboundEvent::PlayerJoined(join_info)) = ev_handler.storage.get_request(id) {
-            let JoinInfo {
-                // TODO: Store PlayerId somewhere?
-                player_id,
-                join_position,
-                room_size,
-            } = *join_info;
+    let id = trigger.event().id();
 
-            // Consume this event
-            ev_handler.storage.take_request(id);
+    if let Some(InboundEvent::PlayerJoined(join_info)) = ev_handler.storage.get_request(id) {
+        let JoinInfo {
+            // TODO: Store PlayerId somewhere?
+            player_id,
+            join_position,
+            room_size,
+        } = *join_info;
 
-            commands.send_event(LogEvent::Push(Message::from_text(format!(
-                "new player joined the lobby ( {} / {} )",
-                join_position, room_size
-            ))));
-            commands.send_event(LogEvent::Push(Message::debug(format!("{:?}", player_id)))); // DEBUG
+        // Consume this event
+        ev_handler.storage.take_request(id);
 
-            if join_position == room_size {
-                state.set(JoiningServerState::WaitingForGameToStart);
-            }
+        commands.send_event(LogEvent::Push(Message::from_text(format!(
+            "new player joined the lobby ( {} / {} )",
+            join_position, room_size
+        ))));
+        commands.send_event(LogEvent::Push(Message::debug(format!("{:?}", player_id)))); // DEBUG
+
+        if join_position == room_size {
+            state.set(JoiningServerState::WaitingForGameToStart);
         }
     }
 }
