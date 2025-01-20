@@ -12,7 +12,6 @@ pub enum ServerToClientEvent {
     Error(Box<str>),
 }
 
-
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Event)]
 pub struct JoinInfo {
     pub player_id: PlayerId,

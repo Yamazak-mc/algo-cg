@@ -1,8 +1,8 @@
 use super::{InboundEvent, OutboundEvent};
 use crate::game::{ServerInternalEvent, WaitingRoom};
 use algo_core::player::PlayerId;
-use async_write_bincode::AsyncWriteSerdeBincode as _;
 use anyhow::{bail, Context};
+use async_write_bincode::AsyncWriteSerdeBincode as _;
 use protocol::WithMetadata;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -140,9 +140,11 @@ impl PendingConnection {
                                 ServerInternalEvent::RequestJoinAccepted(info) => {
                                     let player_id = info.player_id;
                                     stream
-                                        .write_bincode(&data.response_to(
-                                            OutboundEvent::RequestJoinAccepted(info),
-                                        ))
+                                        .write_bincode(
+                                            &data.response_to(OutboundEvent::RequestJoinAccepted(
+                                                info,
+                                            )),
+                                        )
                                         .await?;
 
                                     return Connection::from_pending(self, rx, player_id)

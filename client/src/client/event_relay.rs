@@ -1,6 +1,6 @@
 use super::{InboundEvent, OutboundEvent};
-use async_write_bincode::AsyncWriteSerdeBincode as _;
 use anyhow::bail;
+use async_write_bincode::AsyncWriteSerdeBincode as _;
 use bevy::prelude::info;
 use protocol::WithMetadata;
 use tokio::{io::AsyncReadExt, net::TcpStream, sync::mpsc};

@@ -18,7 +18,7 @@ impl Default for LogDisplaySettings {
     fn default() -> Self {
         Self {
             max_lines: 20,
-            font: TextFont::default()
+            font: TextFont::default(),
         }
     }
 }
