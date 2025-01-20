@@ -36,7 +36,7 @@ impl WaitingRoom {
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
-        let mut player_handlers = BTreeMap::new();
+        let mut player_handlers = BTreeMap::<_, PlayerHandler>::new();
         let mut room = WaitingRoomSeats::default();
         let mut new_player_id = AssignPlayerId::default();
 
@@ -50,6 +50,12 @@ impl WaitingRoom {
 
                     let join_info = room.try_claim(player_id)?;
                     tx.send(ServerInternalEvent::RequestJoinAccepted(join_info))?;
+
+                    // Notify that the new player joined the server to waiting players.
+                    for handler in player_handlers.values_mut() {
+                        handler.send_message(OutboundEvent::PlayerJoined(join_info))?;
+                    }
+
                     player_handlers.insert(player_id, PlayerHandler::new(tx));
                 }
                 ServerInternalEvent::ConnectionLost(player_id) => {

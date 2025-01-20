@@ -25,6 +25,18 @@ impl PlayerHandler {
         }
     }
 
+    pub fn send_message(&mut self, message: OutboundEvent) -> anyhow::Result<()> {
+        let id = self.next_id.produce();
+
+        self.tx.send(ServerInternalEvent::Out(WithMetadata {
+            kind: protocol::EventKind::Request,
+            id,
+            event: message,
+        }))?;
+
+        Ok(())
+    }
+
     pub fn send_game_event(&mut self, event: GameEvent) -> anyhow::Result<()> {
         let id = self.next_id.produce();
 

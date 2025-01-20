@@ -6,13 +6,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Event)]
 pub enum ServerToClientEvent {
     RequestJoinAccepted(JoinInfo),
+    PlayerJoined(JoinInfo),
     PlayerDisconnected(PlayerId),
     GameEvent(GameEvent),
     ServerShutdown,
     Error(Box<str>),
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Event)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, Event)]
 pub struct JoinInfo {
     pub player_id: PlayerId,
     pub join_position: u8,
