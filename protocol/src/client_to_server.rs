@@ -1,3 +1,4 @@
+use algo_core::event::GameEvent;
 use bevy_ecs::event::Event;
 use serde::{Deserialize, Serialize};
 
@@ -5,4 +6,5 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Event)]
 pub enum ClientToServerEvent {
     RequestJoin,
+    GameEventResponse(Option<GameEvent>),
 }

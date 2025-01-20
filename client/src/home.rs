@@ -14,6 +14,7 @@ use client::{
     log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
     util::IntoColor as _,
 };
+use protocol::server_to_client::JoinInfo;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
@@ -257,7 +258,7 @@ fn setup_join_server_ui(mut commands: Commands) {
                 .with_children(|parent| {
                     parent.spawn(LogDisplay::new(LogDisplaySettings {
                         max_lines: 20,
-                        font: TextFont::default(),
+                        ..default()
                     }));
                 });
 
@@ -317,10 +318,21 @@ fn wait_for_connection(
             commands.send_event(LogEvent::Push(Message::success("connected to the server")));
 
             // Now send Join request to the server.
-            let id = ev_handler
+            let id = match ev_handler
                 .expect("event handler should be available at this point")
                 .send_request(OutboundEvent::RequestJoin)
-                .unwrap();
+            {
+                Ok(id) => id,
+                Err(e) => {
+                    // Possibly disconnected from the server.
+                    commands.send_event(LogEvent::Push(Message::error(format!(
+                        "failed to send join request: {}",
+                        e
+                    ))));
+                    state.set(JoiningServerState::Failed);
+                    return;
+                }
+            };
             commands.spawn((
                 StateScoped(JoiningServerState::Joining),
                 JoinRequestEventId(id),
@@ -382,8 +394,17 @@ fn check_response_to_join(
         .expect("response should be available");
 
     match response {
-        InboundEvent::RequestJoinAccepted => {
-            commands.send_event(LogEvent::Push(Message::success("joined the lobby")));
+        InboundEvent::RequestJoinAccepted(JoinInfo {
+            // TODO: Store PlayerId somewhere
+            player_id,
+            join_position,
+            room_size,
+        }) => {
+            commands.send_event(LogEvent::Push(Message::success(format!(
+                "joined the lobby ( {} / {} )",
+                join_position, room_size
+            ))));
+            commands.send_event(LogEvent::Push(Message::debug(format!("{:?}", player_id)))); // DEBUG
             state.set(JoiningServerState::Joined);
         }
         InboundEvent::Error(e) => {

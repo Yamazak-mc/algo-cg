@@ -100,6 +100,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "algo-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "itertools 0.14.0",
+ "rand",
+ "serde",
+ "thiserror 2.0.11",
+ "tokio",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -385,6 +397,16 @@ name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
+
+[[package]]
+name = "async-write-bincode"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "serde",
+ "tokio",
+]
 
 [[package]]
 name = "atomic-waker"
@@ -945,7 +967,7 @@ dependencies = [
  "bevy_reflect",
  "derive_more",
  "glam",
- "itertools",
+ "itertools 0.13.0",
  "rand",
  "rand_distr",
  "serde",
@@ -1443,7 +1465,7 @@ dependencies = [
  "bitflags 2.8.0",
  "cexpr",
  "clang-sys",
- "itertools",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1659,6 +1681,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "argh",
+ "async-write-bincode",
  "bevy",
  "bevy_dev_tools",
  "bevy_simple_text_input",
@@ -2739,6 +2762,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3643,6 +3675,7 @@ checksum = "afbdc74edc00b6f6a218ca6a5364d6226a259d4b8ea1af4a0ea063f27e179f4d"
 name = "protocol"
 version = "0.1.0"
 dependencies = [
+ "algo-core",
  "bevy_ecs",
  "serde",
 ]
@@ -3985,12 +4018,16 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "algo-core",
  "anyhow",
+ "async-write-bincode",
  "bincode",
  "env_logger",
- "log",
  "protocol",
+ "thiserror 2.0.11",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

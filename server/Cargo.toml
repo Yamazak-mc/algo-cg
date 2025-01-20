@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+algo-core = { path = "../algo-core" }
 anyhow = { workspace = true }
+async-write-bincode = { path = "../utils/async-write-bincode" }
 bincode = { workspace = true }
 env_logger = "0.11.6"
-log = "0.4.25"
 protocol = { path = "../protocol" }
+thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
