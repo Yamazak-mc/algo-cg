@@ -14,6 +14,15 @@ pub struct LogDisplaySettings {
     pub font: TextFont,
 }
 
+impl Default for LogDisplaySettings {
+    fn default() -> Self {
+        Self {
+            max_lines: 20,
+            font: TextFont::default()
+        }
+    }
+}
+
 #[derive(Component)]
 #[require(Text)]
 pub struct LogDisplay {
@@ -168,6 +177,13 @@ impl Message {
         }
     }
 
+    pub fn debug(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            color: Color::srgb_u8(0x77, 0xCD, 0xFF),
+        }
+    }
+
     fn normalized(&self) -> impl Iterator<Item = Self> + '_ {
         let color = self.color;
 
@@ -211,58 +227,5 @@ fn relay_event(
                 });
             }
         }
-    }
-}
-
-pub mod test {
-    use super::*;
-
-    pub fn main() {
-        App::new()
-            .add_plugins(DefaultPlugins)
-            .add_plugins(log_display_plugin)
-            .add_systems(Startup, setup)
-            .add_systems(
-                Update,
-                push.run_if(bevy::input::common_conditions::input_pressed(
-                    KeyCode::Enter,
-                )),
-            )
-            .add_systems(
-                Update,
-                clear.run_if(bevy::input::common_conditions::input_just_pressed(
-                    KeyCode::Backspace,
-                )),
-            )
-            .run();
-    }
-
-    fn setup(mut commands: Commands) {
-        commands.spawn(Camera2d);
-
-        commands.spawn((LogDisplay::new(LogDisplaySettings {
-            max_lines: 18,
-            font: TextFont {
-                font_size: 32.0,
-                ..default()
-            },
-        })
-        .with_messages([Message::new("Press Enter to test", Color::WHITE)]),));
-    }
-
-    fn push(mut log_display: Single<&mut LogDisplay>) {
-        use rand::prelude::*;
-        let mut rng = thread_rng();
-
-        let r = rng.gen();
-        let g = rng.gen();
-        let b = rng.gen();
-        let msg = format!("{:>03}, {:>03}, {:>03}", r, g, b);
-
-        log_display.push(Message::new(msg, Color::srgb_u8(r, g, b)));
-    }
-
-    fn clear(mut log_display: Single<&mut LogDisplay>) {
-        log_display.clear();
     }
 }
