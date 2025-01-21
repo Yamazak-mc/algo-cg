@@ -36,7 +36,6 @@ fn main() {
         .insert_resource(args)
         .insert_state(AppState::Home)
         .enable_state_scoped_entities::<AppState>()
-        .add_systems(Update, bevy_dev_tools::states::log_transitions::<AppState>) // DEBUG
         .add_plugins(home::home_plugin)
         .add_systems(Startup, setup)
         .run();
