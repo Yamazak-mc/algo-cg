@@ -12,7 +12,7 @@ use client::{
         OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
     },
     log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
-    util::IntoColor as _,
+    util::{AddStateScopedObserver as _, IntoColor as _},
 };
 use protocol::server_to_client::JoinInfo;
 use std::net::IpAddr;
@@ -111,14 +111,11 @@ pub fn home_plugin(app: &mut App) {
                 in_state(JoiningServerState::Failed).and(is_button_pressed::<ClosePopupButton>),
             ),
         )
-        .add_systems(
-            OnEnter(JoiningServerState::Joining),
-            setup_join_response_observer,
-        )
-        .add_systems(OnEnter(ConnectedToServer), setup_disconnection_observer)
-        .add_systems(
-            OnEnter(JoiningServerState::WaitingForOtherPlayers),
-            setup_new_players_observer,
+        .add_state_scoped_observer(JoiningServerState::Joining, check_response_to_join)
+        .add_state_scoped_observer(ConnectedToServer, check_if_disconnected)
+        .add_state_scoped_observer(
+            JoiningServerState::WaitingForOtherPlayers,
+            check_new_players,
         );
 }
 
@@ -374,13 +371,6 @@ fn wait_for_client_to_shutdown(
     home_state.set(HomeState::Menu);
 }
 
-fn setup_join_response_observer(mut commands: Commands) {
-    commands.spawn((
-        StateScoped(JoiningServerState::Joining),
-        Observer::new(check_response_to_join),
-    ));
-}
-
 #[allow(clippy::never_loop)]
 fn check_response_to_join(
     response: Trigger<ReceivedResponse>,
@@ -459,13 +449,6 @@ fn modify_button_text(mut commands: Commands, children: Single<&Children, With<C
     commands.entity(children[0]).insert(Text::new("Go Back"));
 }
 
-fn setup_disconnection_observer(mut commands: Commands) {
-    commands.spawn((
-        StateScoped(ConnectedToServer),
-        Observer::new(check_if_disconnected),
-    ));
-}
-
 fn check_if_disconnected(
     trigger: Trigger<ReceivedRequest>,
     mut ev_handler: ResMut<client::EventHandler>,
@@ -483,13 +466,6 @@ fn check_if_disconnected(
         commands.send_event(LogEvent::Push(Message::error("disconnected")));
         state.set(JoiningServerState::Failed);
     }
-}
-
-fn setup_new_players_observer(mut commands: Commands) {
-    commands.spawn((
-        StateScoped(JoiningServerState::WaitingForOtherPlayers),
-        Observer::new(check_new_players),
-    ));
 }
 
 fn check_new_players(
