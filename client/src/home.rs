@@ -1,4 +1,4 @@
-use crate::{spawn_common_button, AppArgs, AppState};
+use crate::{AppArgs, AppState};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_dev_tools::states::log_transitions;
 use bevy_simple_text_input::{
@@ -6,7 +6,7 @@ use bevy_simple_text_input::{
     TextInputTextFont, TextInputValue,
 };
 use client::{
-    button::is_button_pressed,
+    button::{button_system, spawn_common_button, ButtonPressed},
     client::{
         client_connection_plugin, spawn_client, CancelSpawnClientEvent, InboundEvent,
         OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
@@ -72,17 +72,17 @@ pub fn home_plugin(app: &mut App) {
         .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
         // .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
         .add_systems(OnEnter(AppState::Home), setup_home)
+        .add_systems(
+            Update,
+            button_system::<JoinServerButton>.run_if(in_state(HomeState::Menu)),
+        )
+        .add_state_scoped_observer(HomeState::Menu, on_click_join_server_button)
+        .add_systems(
+            Update,
+            button_system::<QuitButton>.run_if(in_state(HomeState::Menu)),
+        )
+        .add_state_scoped_observer(HomeState::Menu, on_click_quit_button)
         .add_systems(Update, focus_text_input.run_if(in_state(HomeState::Menu)))
-        .add_systems(
-            Update,
-            on_click_join_server_button
-                .run_if(in_state(HomeState::Menu).and(is_button_pressed::<JoinServerButton>)),
-        )
-        .add_systems(
-            Update,
-            on_click_quit_button
-                .run_if(in_state(HomeState::Menu).and(is_button_pressed::<QuitButton>)),
-        )
         .add_systems(
             Update,
             unfocus_text_input
@@ -92,25 +92,22 @@ pub fn home_plugin(app: &mut App) {
         .add_systems(OnEnter(JoiningServerState::Setup), setup_join_server)
         .add_systems(
             Update,
-            wait_for_connection.run_if(in_state(JoiningServerState::Connecting)),
+            button_system::<PopupCenterButton>.run_if(in_state(HomeState::JoiningServer)),
+        )
+        .add_state_scoped_observer(JoiningServerState::Connecting, on_click_cancel_conn_button)
+        .add_state_scoped_observer(
+            JoiningServerState::Failed,
+            on_click_acknowledge_conn_failure,
         )
         .add_systems(
             Update,
-            on_click_cancel_conn_button.run_if(
-                in_state(JoiningServerState::Connecting).and(is_button_pressed::<ClosePopupButton>),
-            ),
+            wait_for_connection.run_if(in_state(JoiningServerState::Connecting)),
         )
         .add_systems(
             Update,
             wait_for_client_to_shutdown.run_if(in_state(JoiningServerState::Cancelling)),
         )
         .add_systems(OnEnter(JoiningServerState::Failed), modify_button_text)
-        .add_systems(
-            Update,
-            on_click_acknowledge_conn_failure.run_if(
-                in_state(JoiningServerState::Failed).and(is_button_pressed::<ClosePopupButton>),
-            ),
-        )
         .add_state_scoped_observer(JoiningServerState::Joining, check_response_to_join)
         .add_state_scoped_observer(ConnectedToServer, check_if_disconnected)
         .add_state_scoped_observer(
@@ -129,7 +126,7 @@ struct IpAddrTextInput;
 struct JoinServerButton;
 
 #[derive(Component)]
-struct ClosePopupButton;
+struct PopupCenterButton;
 
 #[derive(Component)]
 struct QuitButton;
@@ -225,11 +222,14 @@ fn unfocus_text_input(
     }
 }
 
-fn on_click_quit_button(mut commands: Commands) {
+fn on_click_quit_button(_trigger: Trigger<ButtonPressed<QuitButton>>, mut commands: Commands) {
     commands.send_event(bevy::app::AppExit::Success);
 }
 
-fn on_click_join_server_button(mut home_state: ResMut<NextState<HomeState>>) {
+fn on_click_join_server_button(
+    _trigger: Trigger<ButtonPressed<JoinServerButton>>,
+    mut home_state: ResMut<NextState<HomeState>>,
+) {
     home_state.set(HomeState::JoiningServer);
 }
 
@@ -271,7 +271,7 @@ fn setup_join_server_ui(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|parent| {
-                    spawn_common_button(parent, "Cancel", ClosePopupButton);
+                    spawn_common_button(parent, "Cancel", PopupCenterButton);
                 });
         });
 }
@@ -430,6 +430,7 @@ fn check_response_to_join(
 }
 
 fn on_click_cancel_conn_button(
+    _trigger: Trigger<ButtonPressed<PopupCenterButton>>,
     mut commands: Commands,
     mut state: ResMut<NextState<JoiningServerState>>,
 ) {
@@ -440,12 +441,18 @@ fn on_click_cancel_conn_button(
     state.set(JoiningServerState::Cancelling);
 }
 
-fn on_click_acknowledge_conn_failure(mut home_state: ResMut<NextState<HomeState>>) {
+fn on_click_acknowledge_conn_failure(
+    _trigger: Trigger<ButtonPressed<PopupCenterButton>>,
+    mut home_state: ResMut<NextState<HomeState>>,
+) {
     // Go back to home menu
     home_state.set(HomeState::Menu);
 }
 
-fn modify_button_text(mut commands: Commands, children: Single<&Children, With<ClosePopupButton>>) {
+fn modify_button_text(
+    mut commands: Commands,
+    children: Single<&Children, With<PopupCenterButton>>,
+) {
     commands.entity(children[0]).insert(Text::new("Go Back"));
 }
 
