@@ -8,7 +8,6 @@ use bevy_simple_text_input::TextInputPlugin;
 use client::log_display::log_display_plugin;
 
 mod home;
-mod lobby;
 
 /// Arguments for launching client app.
 #[derive(argh::FromArgs, Debug, Resource)]
@@ -25,7 +24,6 @@ struct AppArgs {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, States)]
 enum AppState {
     Home,
-    Lobby,
 }
 
 fn main() {
@@ -40,7 +38,6 @@ fn main() {
         .enable_state_scoped_entities::<AppState>()
         .add_systems(Update, bevy_dev_tools::states::log_transitions::<AppState>) // DEBUG
         .add_plugins(home::home_plugin)
-        .add_plugins(lobby::lobby_plugin)
         .add_systems(Startup, setup)
         .run();
 }
