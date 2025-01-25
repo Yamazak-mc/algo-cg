@@ -74,20 +74,16 @@ pub fn home_plugin(app: &mut App) {
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(
             Update,
-            button_system::<JoinServerButton>.run_if(in_state(HomeState::Menu)),
+            (
+                button_system::<JoinServerButton>,
+                button_system::<QuitButton>,
+                focus_text_input,
+                unfocus_text_input.run_if(input_just_pressed(MouseButton::Left)),
+            )
+                .run_if(in_state(HomeState::Menu)),
         )
         .add_state_scoped_observer(HomeState::Menu, on_click_join_server_button)
-        .add_systems(
-            Update,
-            button_system::<QuitButton>.run_if(in_state(HomeState::Menu)),
-        )
         .add_state_scoped_observer(HomeState::Menu, on_click_quit_button)
-        .add_systems(Update, focus_text_input.run_if(in_state(HomeState::Menu)))
-        .add_systems(
-            Update,
-            unfocus_text_input
-                .run_if(in_state(HomeState::Menu).and(input_just_pressed(MouseButton::Left))),
-        )
         .add_systems(OnEnter(HomeState::JoiningServer), setup_join_server_ui)
         .add_systems(OnEnter(JoiningServerState::Setup), setup_join_server)
         .add_systems(
