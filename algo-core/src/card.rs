@@ -9,6 +9,24 @@ pub enum CardColor {
     White,
 }
 
+impl CardColor {
+    /// Returns a background color in RGB format.
+    pub fn bg_color_rgb(&self) -> [u8; 3] {
+        match self {
+            Self::Black => [0; 3],
+            Self::White => [u8::MAX; 3],
+        }
+    }
+
+    /// Returns a text color in RGB format.
+    pub fn text_color_rgb(&self) -> [u8; 3] {
+        match self {
+            Self::Black => [u8::MAX; 3],
+            Self::White => [0; 3],
+        }
+    }
+}
+
 pub type CardNumberType = u8;
 
 /// A number assigned to the card.
