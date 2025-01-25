@@ -14,7 +14,7 @@ pub type CardNumberType = u8;
 /// A number assigned to the card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(transparent)]
-pub struct CardNumber(CardNumberType);
+pub struct CardNumber(pub CardNumberType);
 
 impl From<CardNumberType> for CardNumber {
     fn from(value: CardNumberType) -> Self {
