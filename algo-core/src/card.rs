@@ -145,6 +145,18 @@ impl CardView {
     }
 }
 
+impl std::fmt::Display for CardView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}-{}",
+            self.pub_info.color,
+            self.priv_info
+                .map_or("?".into(), |v| v.number.0.to_string())
+        )
+    }
+}
+
 /// Returns a list of card instances to add to the talon.
 pub(crate) fn create_cards<J>(
     numbers: impl IntoIterator<Item = CardNumberType>,
