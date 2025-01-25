@@ -50,29 +50,3 @@ fn setup(mut commands: Commands) {
         },
     ));
 }
-
-fn spawn_common_button<M: Component>(parent: &mut ChildBuilder, text: &str, marker: M) {
-    parent
-        .spawn((
-            marker,
-            Node {
-                width: Val::Px(320.0),
-                height: Val::Px(48.0),
-                padding: UiRect::top(Val::Px(3.0)),
-                align_content: AlignContent::Center,
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BorderColor(Color::WHITE),
-            BackgroundColor(Color::srgb_u8(0x57, 0x7B, 0xC1)),
-            Button,
-        ))
-        .with_child((
-            Text::new(text),
-            TextFont {
-                font_size: 36.0,
-                ..default()
-            },
-            TextColor(Color::srgb_u8(0xFF, 0xFA, 0xEC)),
-        ));
-}
