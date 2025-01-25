@@ -104,6 +104,21 @@ pub struct CardView {
 }
 
 impl CardView {
+    /// Constructs a new `CardView`.
+    ///
+    /// NOTE: This function can create an invalid state where
+    ///       the card is revealed but the number is missing.
+    #[allow(unused)]
+    pub fn from_props(color: CardColor, number: Option<CardNumber>, revealed: bool) -> Self {
+        let pub_info = CardPubInfo { color, revealed };
+        let priv_info = number.map(CardPrivInfo::new);
+
+        Self {
+            pub_info,
+            priv_info,
+        }
+    }
+
     fn full(card: Card) -> Self {
         Self {
             pub_info: card.pub_info,
