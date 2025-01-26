@@ -197,29 +197,32 @@ impl FromStr for CardView {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = s.split('-');
         let color = iter.next().context("CardColor is missing")?.parse()?;
-        let priv_info = match iter.next().context("CardNumber is missing")?.trim() {
-            "?" => {
-                return Ok(Self {
-                    pub_info: CardPubInfo {
-                        color,
-                        revealed: false,
-                    },
-                    priv_info: None,
-                });
-            }
-            n => Some(n.parse().map(|v| CardPrivInfo::new(CardNumber(v)))?),
+
+        let ret = match iter.next().context("CardNumber is missing")?.trim() {
+            "?" => Self {
+                pub_info: CardPubInfo {
+                    color,
+                    revealed: false,
+                },
+                priv_info: None,
+            },
+            n if n.starts_with('(') && n.ends_with(')') => Self {
+                pub_info: CardPubInfo {
+                    color,
+                    revealed: false,
+                },
+                priv_info: Some(CardPrivInfo::new(CardNumber(n[1..n.len() - 1].parse()?))),
+            },
+            n => Self {
+                pub_info: CardPubInfo {
+                    color,
+                    revealed: true,
+                },
+                priv_info: Some(CardPrivInfo::new(CardNumber(n.parse()?))),
+            },
         };
 
-        let revealed = match iter.next().map(|v| v.trim()) {
-            Some("U") | Some("u") => true,
-            Some("D") | Some("d") => false,
-            _ => true,
-        };
-
-        return Ok(Self {
-            pub_info: CardPubInfo { color, revealed },
-            priv_info,
-        });
+        Ok(ret)
     }
 }
 
