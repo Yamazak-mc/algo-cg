@@ -1,6 +1,8 @@
+use anyhow::{bail, Context as _};
 use itertools::Itertools as _;
 use rand::seq::SliceRandom as _;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Possible card colors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
@@ -24,6 +26,20 @@ impl CardColor {
             Self::Black => [u8::MAX; 3],
             Self::White => [0; 3],
         }
+    }
+}
+
+impl FromStr for CardColor {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let color = match &*s.trim().to_lowercase() {
+            "black" => Self::Black,
+            "white" => Self::White,
+            unknown => bail!("unknown CardColor: {}", unknown),
+        };
+
+        Ok(color)
     }
 }
 
@@ -172,6 +188,38 @@ impl std::fmt::Display for CardView {
             self.priv_info
                 .map_or("?".into(), |v| v.number.0.to_string())
         )
+    }
+}
+
+impl FromStr for CardView {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut iter = s.split('-');
+        let color = iter.next().context("CardColor is missing")?.parse()?;
+        let priv_info = match iter.next().context("CardNumber is missing")?.trim() {
+            "?" => {
+                return Ok(Self {
+                    pub_info: CardPubInfo {
+                        color,
+                        revealed: false,
+                    },
+                    priv_info: None,
+                });
+            }
+            n => Some(n.parse().map(|v| CardPrivInfo::new(CardNumber(v)))?),
+        };
+
+        let revealed = match iter.next().map(|v| v.trim()) {
+            Some("U") | Some("u") => true,
+            Some("D") | Some("d") => false,
+            _ => true,
+        };
+
+        return Ok(Self {
+            pub_info: CardPubInfo { color, revealed },
+            priv_info,
+        });
     }
 }
 
