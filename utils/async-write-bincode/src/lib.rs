@@ -4,7 +4,7 @@ use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 
 pub trait AsyncWriteSerdeBincode: AsyncWriteExt {
-    async fn write_bincode<'a, T>(&'a mut self, data: &T) -> anyhow::Result<()>
+    async fn write_bincode<T>(&mut self, data: &T) -> anyhow::Result<()>
     where
         Self: Unpin,
         T: Serialize,
