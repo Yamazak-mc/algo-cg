@@ -56,6 +56,12 @@ impl From<CardNumberType> for CardNumber {
     }
 }
 
+impl PartialEq<CardNumberType> for CardNumber {
+    fn eq(&self, other: &CardNumberType) -> bool {
+        self.0.eq(other)
+    }
+}
+
 /// A main card structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Card {
@@ -181,12 +187,15 @@ impl CardView {
 
 impl std::fmt::Display for CardView {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let revealed = self.pub_info.revealed;
         write!(
             f,
-            "{:?}-{}",
+            "{:?}-{}{}{}",
             self.pub_info.color,
+            if revealed { "" } else { "(" },
             self.priv_info
-                .map_or("?".into(), |v| v.number.0.to_string())
+                .map_or("?".into(), |v| v.number.0.to_string()),
+            if revealed { "" } else { ")" },
         )
     }
 }
