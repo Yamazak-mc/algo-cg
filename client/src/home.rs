@@ -131,16 +131,6 @@ struct PopupCenterButton;
 struct QuitButton;
 
 fn setup_home(mut commands: Commands, args: Res<AppArgs>) {
-    // Setup camera
-    commands.spawn((
-        StateScoped(AppState::Home),
-        Camera2d,
-        Camera {
-            clear_color: ClearColorConfig::Custom(Color::srgb_u8(20, 20, 26)),
-            ..default()
-        },
-    ));
-
     let server_ip_text = args.server_ip.clone().unwrap_or_default();
 
     commands
