@@ -1,4 +1,4 @@
-use crate::util::IntoColor;
+use crate::utils::into_color::IntoColor;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 

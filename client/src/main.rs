@@ -5,7 +5,7 @@
 
 use bevy::prelude::*;
 use bevy_simple_text_input::TextInputPlugin;
-use client::log_display::log_display_plugin;
+use client::utils::log_display::log_display_plugin;
 
 mod home;
 

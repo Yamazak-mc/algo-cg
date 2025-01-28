@@ -6,13 +6,16 @@ use bevy_simple_text_input::{
     TextInputTextFont, TextInputValue,
 };
 use client::{
-    button::{button_system, spawn_common_button, ButtonPressed},
     client::{
         client_connection_plugin, spawn_client, CancelSpawnClientEvent, InboundEvent,
         OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
     },
+    utils::{
+        add_observer_ext::AddStateScopedObserver,
+        button::{button_system, spawn_common_button, ButtonPressed},
+        into_color::IntoColor,
     log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
-    util::{AddStateScopedObserver as _, IntoColor as _},
+    },
 };
 use protocol::server_to_client::JoinInfo;
 use std::net::IpAddr;
