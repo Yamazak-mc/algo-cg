@@ -17,7 +17,7 @@ struct AppArgs {
     server_ip: Option<String>,
 
     /// server port number
-    #[argh(option, default = "client::DEFAULT_SERVER_PORT")]
+    #[argh(option, default = "protocol::DEFAULT_SERVER_PORT")]
     server_port: u16,
 }
 
