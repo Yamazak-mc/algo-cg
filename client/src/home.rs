@@ -14,7 +14,7 @@ use client::{
         add_observer_ext::AddStateScopedObserver,
         button::{button_system, spawn_common_button, ButtonPressed},
         into_color::IntoColor,
-    log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
+        log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
     },
 };
 use protocol::server_to_client::JoinInfo;
