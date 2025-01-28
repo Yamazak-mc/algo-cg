@@ -178,7 +178,7 @@ fn reveal_card(
     // Animation
     commands
         .entity(children[0])
-        .insert(animation.animation_target.clone());
+        .insert(animation.animation_target);
     animation_player
         .get_mut(animation.animation_target.player)
         .unwrap()

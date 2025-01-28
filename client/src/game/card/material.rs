@@ -305,7 +305,7 @@ fn common_draw_method(
 
         let idx = caluclate_rgba_img_idx(width, x, y);
 
-        for ((v, bg_color), text_color) in (&mut rgba_img_buf[idx..idx + 3])
+        for ((v, bg_color), text_color) in rgba_img_buf[idx..idx + 3]
             .iter_mut()
             .zip(bg_color.0)
             .zip(text_color.0)

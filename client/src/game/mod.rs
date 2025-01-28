@@ -290,8 +290,5 @@ fn calculate_card_translation(origin: Transform, idx: u32, len: u32) -> Vec3 {
     let offset = if len % 2 == 0 { 0.5 } else { 0.0 };
     let distance = (j as f32 + offset) * CARD_WIDTH_PLUS_GAP;
 
-    let direction = origin.right();
-    let translation = origin.translation + direction * distance;
-
-    translation
+    origin.translation + distance * origin.right()
 }

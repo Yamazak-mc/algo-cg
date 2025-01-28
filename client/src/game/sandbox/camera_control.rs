@@ -57,7 +57,7 @@ fn show_control_info(mut commands: Commands) {
             key_name(KEY_ROTATE_FORWARD),
             key_name(KEY_ROTATE_BACK),
             key_name(KEY_RESET_XF),
-            format!(
+            format_args!(
                 "[Misc]\nPrint camera xf: {}\nToggle this msg: {}",
                 key_name(KEY_PRINT_XF),
                 key_name(KEY_TOGGLE_MSG),

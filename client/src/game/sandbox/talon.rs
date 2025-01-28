@@ -103,7 +103,6 @@ pub struct Real;
 impl SpawnCards for Real {
     fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
         let mut cards = (0..=11)
-            .into_iter()
             .cartesian_product([CardColor::Black, CardColor::White])
             .map(|(n, c)| CardView::from_props(c, Some(CardNumber(n)), false))
             .collect::<Vec<_>>();
