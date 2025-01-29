@@ -9,12 +9,6 @@ pub struct CardMeshPlugin {
     pub card_size: Vec3,
 }
 
-impl CardMeshPlugin {
-    pub fn new(card_size: Vec3) -> Self {
-        Self { card_size }
-    }
-}
-
 impl Plugin for CardMeshPlugin {
     fn build(&self, app: &mut App) {
         let card_size = self.card_size;

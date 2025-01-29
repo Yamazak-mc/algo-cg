@@ -282,14 +282,12 @@ impl Talon {
 
     pub fn view(&self) -> TalonView {
         TalonView {
-            top_card: self.cards.last().map(|v| v.pub_info),
-            cards_remaining: self.cards.len() as u32,
+            cards: self.cards.iter().map(|v| v.public_view()).collect(),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TalonView {
-    pub top_card: Option<CardPubInfo>,
-    pub cards_remaining: u32,
+    pub cards: Vec<CardView>,
 }

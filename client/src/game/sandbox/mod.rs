@@ -1,11 +1,12 @@
 use super::{
     card::{
         flip_animation::CardFlipAnimation,
+        instance::CardInstance,
         picking::PickableCard,
         tag::{AddCardTag, RemoveCardTag},
     },
-    CardField, CardFieldOwnedBy, CardInstance, GameMode, MyCardField, CARD_DEPTH, CARD_HEIGHT,
-    CARD_Z_GAP_RATIO, GAME_SCOPE, TALON_TRANSLATION,
+    card_field::{CardField, CardFieldOwnedBy, MyCardField},
+    GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
 use crate::AppState;
 use algo_core::player::PlayerId;
@@ -15,21 +16,21 @@ mod talon;
 use talon::SandboxTalon;
 
 mod camera_control;
-use camera_control::camera_control_plugin;
-
-const CTX_STATE: GameMode = GameMode::Sandbox;
+use camera_control::SandboxCameraControlPlugin;
 
 pub fn game_sandbox_plugin(app: &mut App) {
-    app.add_plugins(camera_control_plugin)
-        .insert_non_send_resource(SandboxTalon::new(talon::Real))
-        .add_systems(
-            Update,
-            start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),
-        )
-        .add_systems(
-            OnEnter(CTX_STATE),
-            (setup_game_sandbox, setup_game_sandbox_2).chain(),
-        );
+    app.add_plugins(SandboxCameraControlPlugin {
+        ctx_state: GameMode::Sandbox,
+    })
+    .insert_non_send_resource(SandboxTalon::new(talon::Real))
+    .add_systems(
+        Update,
+        start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),
+    )
+    .add_systems(
+        OnEnter(GameMode::Sandbox),
+        (setup_game_sandbox, setup_game_sandbox_2).chain(),
+    );
 }
 
 fn start_sandbox(
@@ -48,7 +49,7 @@ fn setup_game_sandbox(mut commands: Commands, mut talon: NonSendMut<SandboxTalon
     let card_field_z = CARD_HEIGHT * (1.0 + CARD_Z_GAP_RATIO) * 2.0;
 
     commands.spawn((
-        GAME_SCOPE,
+        StateScoped(AppState::Game),
         MyCardField,
         CardFieldOwnedBy(self_player),
         Transform::from_xyz(0.0, CARD_DEPTH / 2.0, card_field_z),
@@ -56,7 +57,7 @@ fn setup_game_sandbox(mut commands: Commands, mut talon: NonSendMut<SandboxTalon
 
     // Opponent's field
     commands.spawn((
-        GAME_SCOPE,
+        StateScoped(AppState::Game),
         CardFieldOwnedBy(opponent_player),
         Transform::from_xyz(0.0, CARD_DEPTH / 2.0, -card_field_z).looking_to(Vec3::Z, Vec3::Y),
     ));

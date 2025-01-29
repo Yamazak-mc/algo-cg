@@ -1,4 +1,7 @@
-use crate::game::{CardInstance, CARD_DEPTH, GAME_SCOPE};
+use crate::{
+    game::{card::instance::CardInstance, CARD_DEPTH},
+    AppState,
+};
 use algo_core::card::{CardColor, CardNumber, CardPrivInfo, CardPubInfo, CardView};
 use bevy::prelude::*;
 use itertools::Itertools as _;
@@ -126,7 +129,7 @@ where
         transform.translation.y += i as f32 * CARD_DEPTH;
 
         let id = commands
-            .spawn((GAME_SCOPE, CardInstance(card), transform))
+            .spawn((StateScoped(AppState::Game), CardInstance(card), transform))
             .id();
 
         id

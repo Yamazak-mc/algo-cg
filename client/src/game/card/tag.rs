@@ -1,12 +1,15 @@
+use super::instance::CardInstance;
 use crate::{
-    game::{CardInstance, CARD_HEIGHT},
+    game::{utils::world_to_2d_pos, CARD_HEIGHT},
     AppState,
 };
-use anyhow::Context as _;
 use bevy::prelude::*;
 use client::utils::add_observer_ext::AddStateScopedObserver as _;
 
 const FONT_SIZE: f32 = 32.0;
+
+const TAG_3D_OFFSET: Vec3 = Vec3::new(0.0, 0.0, -CARD_HEIGHT / 2.0);
+const TAG_2D_OFFSET: Vec3 = Vec3::new(0.0, FONT_SIZE * 0.75, 0.0);
 
 pub fn card_tag_plugin(app: &mut App) {
     let ctx_state = AppState::Game;
@@ -80,15 +83,18 @@ impl CardTagOwner {
         let (camera, camera_transform) = *camera;
 
         for (owner, card_transform) in &query {
-            let Ok(text_pos) = calc_text_pos(camera, camera_transform, card_transform.translation)
-            else {
+            let Ok(text_pos) = world_to_2d_pos(
+                camera,
+                camera_transform,
+                card_transform.translation + TAG_3D_OFFSET,
+            ) else {
                 return;
             };
 
             tag_transforms
                 .get_mut(owner.tag_entity)
                 .unwrap()
-                .translation = text_pos;
+                .translation = text_pos + TAG_2D_OFFSET;
         }
     }
 }
@@ -111,38 +117,16 @@ impl CardTag {
 
         // World to viewport
         let (camera, camera_transform) = *camera;
-        let Ok(text_pos) = calc_text_pos(
+        let Ok(text_pos) = world_to_2d_pos(
             camera,
             camera_transform,
-            transform.get(owner_entity).unwrap().translation,
+            transform.get(owner_entity).unwrap().translation + TAG_3D_OFFSET,
         ) else {
             return;
         };
 
-        transform.get_mut(tag_entity).unwrap().translation = text_pos;
+        transform.get_mut(tag_entity).unwrap().translation = text_pos + TAG_2D_OFFSET;
     }
-}
-
-fn calc_text_pos(
-    camera: &Camera,
-    camera_transform: &GlobalTransform,
-    at: Vec3,
-) -> anyhow::Result<Vec3> {
-    let vpsize = camera
-        .logical_viewport_size()
-        .context("failed to get viewport size")?;
-
-    let pos = camera
-        .world_to_viewport(
-            camera_transform,
-            at + Vec3::new(0.0, 0.0, -CARD_HEIGHT / 2.0),
-        )
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    let x = pos.x - vpsize.x / 2.0;
-    let y = vpsize.y / 2.0 - pos.y + FONT_SIZE * 0.75;
-
-    Ok(Vec3::new(x, y, 0.0))
 }
 
 fn on_camera_movement(

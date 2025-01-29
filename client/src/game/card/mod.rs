@@ -1,19 +1,27 @@
-use super::CARD_SIZE;
-use bevy::app::{PluginGroup, PluginGroupBuilder};
+use bevy::{
+    app::{PluginGroup, PluginGroupBuilder},
+    math::Vec3,
+};
 
 pub mod flip_animation;
+pub mod instance;
 pub mod material;
 pub mod mesh;
 pub mod name;
 pub mod picking;
 pub mod tag;
 
-pub struct CardPlugins;
+pub struct CardPlugins {
+    pub card_size: Vec3,
+}
 
 impl PluginGroup for CardPlugins {
     fn build(self) -> PluginGroupBuilder {
         PluginGroupBuilder::start::<Self>()
-            .add(mesh::CardMeshPlugin::new(CARD_SIZE))
+            .add(instance::card_instance_plugin)
+            .add(mesh::CardMeshPlugin {
+                card_size: self.card_size,
+            })
             .add(material::card_material_plugin)
             .add(tag::card_tag_plugin)
             .add(picking::card_picking_plugin)

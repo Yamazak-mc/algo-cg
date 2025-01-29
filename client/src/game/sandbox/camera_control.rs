@@ -1,4 +1,3 @@
-use super::CTX_STATE;
 use crate::game::{CAMERA_ROTATION, CAMERA_TRANSLATION};
 use bevy::{
     input::common_conditions::{input_just_pressed, input_pressed},
@@ -19,25 +18,31 @@ const KEY_RESET_XF: KeyCode = KeyCode::KeyQ;
 const KEY_PRINT_XF: KeyCode = KeyCode::KeyP;
 const KEY_TOGGLE_MSG: KeyCode = KeyCode::KeyM;
 
-pub fn camera_control_plugin(app: &mut App) {
-    app.add_systems(OnEnter(CTX_STATE), show_control_info)
-        .add_systems(
-            Update,
-            (
-                camera_vertical_move::<-1>.run_if(input_pressed(KEY_FORWARD)),
-                camera_vertical_move::<1>.run_if(input_pressed(KEY_BACK)),
-                camera_horizontal_move::<1>.run_if(input_pressed(KEY_RIGHT)),
-                camera_horizontal_move::<-1>.run_if(input_pressed(KEY_LEFT)),
-                zoom_camera::<1>.run_if(input_pressed(KEY_ZOOM_IN)),
-                zoom_camera::<-1>.run_if(input_pressed(KEY_ZOOM_OUT)),
-                rotate_camera::<-1>.run_if(input_pressed(KEY_ROTATE_FORWARD)),
-                rotate_camera::<1>.run_if(input_pressed(KEY_ROTATE_BACK)),
-                reset_camera.run_if(input_pressed(KEY_RESET_XF)),
-                print_camera_transform.run_if(input_just_pressed(KEY_PRINT_XF)),
-                toggle_control_msg.run_if(input_just_pressed(KEY_TOGGLE_MSG)),
-            )
-                .run_if(in_state(CTX_STATE)),
-        );
+pub struct SandboxCameraControlPlugin<T> {
+    pub ctx_state: T,
+}
+
+impl<T: States + Clone> Plugin for SandboxCameraControlPlugin<T> {
+    fn build(&self, app: &mut App) {
+        app.add_systems(OnEnter(self.ctx_state.clone()), show_control_info)
+            .add_systems(
+                Update,
+                (
+                    camera_vertical_move::<-1>.run_if(input_pressed(KEY_FORWARD)),
+                    camera_vertical_move::<1>.run_if(input_pressed(KEY_BACK)),
+                    camera_horizontal_move::<1>.run_if(input_pressed(KEY_RIGHT)),
+                    camera_horizontal_move::<-1>.run_if(input_pressed(KEY_LEFT)),
+                    zoom_camera::<1>.run_if(input_pressed(KEY_ZOOM_IN)),
+                    zoom_camera::<-1>.run_if(input_pressed(KEY_ZOOM_OUT)),
+                    rotate_camera::<-1>.run_if(input_pressed(KEY_ROTATE_FORWARD)),
+                    rotate_camera::<1>.run_if(input_pressed(KEY_ROTATE_BACK)),
+                    reset_camera.run_if(input_pressed(KEY_RESET_XF)),
+                    print_camera_transform.run_if(input_just_pressed(KEY_PRINT_XF)),
+                    toggle_control_msg.run_if(input_just_pressed(KEY_TOGGLE_MSG)),
+                )
+                    .run_if(in_state(self.ctx_state.clone())),
+            );
+    }
 }
 
 #[derive(Component)]

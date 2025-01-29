@@ -1,4 +1,5 @@
-use crate::{game::CardInstance, AppState};
+use super::instance::CardInstance;
+use crate::AppState;
 use bevy::prelude::*;
 
 pub fn card_name_plugin(app: &mut App) {
