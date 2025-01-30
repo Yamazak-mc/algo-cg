@@ -137,6 +137,8 @@ impl CardPrivInfo {
     }
 }
 
+// TODO: Refactor the struct into an enum to eliminate an invalid state
+//       where a card is revealed but its number is missing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct CardView {
     pub pub_info: CardPubInfo,
