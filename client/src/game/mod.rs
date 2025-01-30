@@ -1,15 +1,13 @@
 use crate::AppState;
 use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
-use client::utils::animate_once::AnimateOncePlugin;
+use client::utils::{animate_once::AnimateOncePlugin, world_to_2d::world_to_2d_plugin};
 
 mod card;
 use card::CardPlugins;
 
 mod card_field;
 use card_field::card_field_plugin;
-
-mod utils;
 
 // DEBUG
 mod sandbox;
@@ -46,6 +44,7 @@ pub fn game_plugin(app: &mut App) {
         .add_plugins((
             InfiniteGridPlugin,
             AnimateOncePlugin::from_state(AppState::Game),
+            world_to_2d_plugin,
             CardPlugins {
                 card_size: CARD_SIZE,
             },
