@@ -41,7 +41,11 @@ impl SandboxTalon {
 }
 
 pub trait SpawnCards {
-    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity>;
+    fn produce_cards(&mut self) -> Vec<CardView>;
+
+    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
+        spawn_cards_impl(self.produce_cards(), commands, at).collect()
+    }
 }
 
 pub struct Messy {
@@ -75,9 +79,8 @@ impl Messy {
 }
 
 impl SpawnCards for Messy {
-    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
-        let cards = (0..self.size).map(|_| self.get_messy_card());
-        spawn_cards_impl(cards, commands, at).collect()
+    fn produce_cards(&mut self) -> Vec<CardView> {
+        (0..self.size).map(|_| self.get_messy_card()).collect()
     }
 }
 
@@ -87,24 +90,23 @@ pub struct SingleVariant {
 }
 
 impl SpawnCards for SingleVariant {
-    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
-        let cards = std::iter::repeat_n(self.card, self.size as usize);
-        spawn_cards_impl(cards, commands, at).collect()
+    fn produce_cards(&mut self) -> Vec<CardView> {
+        std::iter::repeat_n(self.card, self.size as usize).collect()
     }
 }
 
 pub struct Fixed(pub Vec<CardView>);
 
 impl SpawnCards for Fixed {
-    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
-        spawn_cards_impl(self.0.iter().rev().cloned(), commands, at).collect()
+    fn produce_cards(&mut self) -> Vec<CardView> {
+        self.0.iter().rev().cloned().collect()
     }
 }
 
 pub struct Real;
 
 impl SpawnCards for Real {
-    fn spawn_cards<'a>(&'a mut self, commands: &'a mut Commands, at: Transform) -> Vec<Entity> {
+    fn produce_cards(&mut self) -> Vec<CardView> {
         let mut cards = (0..=11)
             .cartesian_product([CardColor::Black, CardColor::White])
             .map(|(n, c)| CardView::from_props(c, Some(CardNumber(n)), false))
@@ -112,7 +114,7 @@ impl SpawnCards for Real {
 
         cards.shuffle(&mut rand::rng());
 
-        spawn_cards_impl(cards, commands, at).collect()
+        cards
     }
 }
 
