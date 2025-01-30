@@ -181,12 +181,12 @@ impl AddPrivInfo {
         let entity = trigger.entity();
         let card = &mut query.get_mut(entity).unwrap().0;
 
-        if !ComputedCardInstState::compute(&card).unwrap().is_spawned() {
+        if !ComputedCardInstState::compute(card).unwrap().is_spawned() {
             warn!("invalid card instance state for an event `RevealWith`");
             return;
         }
 
-        card.priv_info = Some(trigger.event().0.clone());
+        card.priv_info = Some(trigger.event().0);
 
         commands.trigger_targets(UpdateMaterial(*card), entity);
     }
@@ -205,7 +205,7 @@ impl Reveal {
         let entity = trigger.entity();
         let card = &mut query.get_mut(entity).unwrap().0;
 
-        if !ComputedCardInstState::compute(&card).unwrap().is_private() {
+        if !ComputedCardInstState::compute(card).unwrap().is_private() {
             warn!("invalid card instance state for an event `Reveal`");
             return;
         }
@@ -229,13 +229,13 @@ impl RevealWith {
         let entity = trigger.entity();
         let card = &mut query.get_mut(entity).unwrap().0;
 
-        if !ComputedCardInstState::compute(&card).unwrap().is_spawned() {
+        if !ComputedCardInstState::compute(card).unwrap().is_spawned() {
             warn!("invalid card instance state for an event `RevealWith`");
             return;
         }
 
         card.pub_info.revealed = true;
-        card.priv_info = Some(trigger.event().0.clone());
+        card.priv_info = Some(trigger.event().0);
 
         commands.trigger_targets(UpdateMaterial(*card), entity);
         commands.trigger_targets(FlipCard, entity);

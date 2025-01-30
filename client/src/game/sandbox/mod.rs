@@ -118,6 +118,7 @@ fn setup_talon_top(talon: &mut SandboxTalon, commands: &mut Commands, children: 
     commands.entity(children[0]).insert(PickableCard);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn on_click_talon_top(
     trigger: Trigger<Pointer<Click>>,
     cards: Query<&CardInstance>,
