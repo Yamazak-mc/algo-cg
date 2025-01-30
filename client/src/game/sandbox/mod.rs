@@ -3,7 +3,7 @@ use super::{
         flip_animation::CardFlipAnimation,
         instance::CardInstance,
         picking::PickableCard,
-        tag::{AddCardTag, RemoveCardTag},
+        tag::{DespawnCardTag, SpawnCardTag},
     },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
@@ -118,7 +118,7 @@ fn on_click_talon_top(
     let card_entity = trigger.entity();
 
     // DEBUG
-    commands.trigger_targets(AddCardTag, card_entity);
+    commands.trigger_targets(SpawnCardTag, card_entity);
 
     // Update talon state
     talon.draw_card();
@@ -174,7 +174,7 @@ fn reveal_card(
 
     // Update state
     card.pub_info.revealed = true;
-    commands.trigger_targets(RemoveCardTag, entity);
+    commands.trigger_targets(DespawnCardTag, entity); // DEBUG
 
     // Animation
     commands

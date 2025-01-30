@@ -14,14 +14,14 @@ const TAG_2D_OFFSET: Vec3 = Vec3::new(0.0, FONT_SIZE * 0.75, 0.0);
 pub fn card_tag_plugin(app: &mut App) {
     let ctx_state = AppState::Game;
 
-    app.add_state_scoped_observer(ctx_state, AddCardTag::handle_trigger)
-        .add_state_scoped_observer(ctx_state, RemoveCardTag::handle_trigger);
+    app.add_state_scoped_observer(ctx_state, SpawnCardTag::handle_trigger)
+        .add_state_scoped_observer(ctx_state, DespawnCardTag::handle_trigger);
 }
 
 #[derive(Event)]
-pub struct AddCardTag;
+pub struct SpawnCardTag;
 
-impl AddCardTag {
+impl SpawnCardTag {
     fn handle_trigger(trigger: Trigger<Self>, mut commands: Commands, query: Query<&CardInstance>) {
         let card_entity = trigger.entity();
         let card = query.get(card_entity).unwrap();
@@ -50,9 +50,9 @@ impl AddCardTag {
 }
 
 #[derive(Event)]
-pub struct RemoveCardTag;
+pub struct DespawnCardTag;
 
-impl RemoveCardTag {
+impl DespawnCardTag {
     fn handle_trigger(trigger: Trigger<Self>, mut commands: Commands) {
         let card_entity = trigger.entity();
 
