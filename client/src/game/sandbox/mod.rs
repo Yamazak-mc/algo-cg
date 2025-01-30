@@ -19,10 +19,17 @@ mod camera_control;
 use camera_control::SandboxCameraControlPlugin;
 
 pub fn game_sandbox_plugin(app: &mut App) {
+    let card_spawner = talon::Map::new(talon::Real, |(i, mut card)| {
+        if i % 2 == 1 {
+            card.priv_info = None;
+        }
+        card
+    });
+
     app.add_plugins(SandboxCameraControlPlugin {
         ctx_state: GameMode::Sandbox,
     })
-    .insert_non_send_resource(SandboxTalon::new(talon::Real))
+    .insert_non_send_resource(SandboxTalon::new(card_spawner))
     .add_systems(
         Update,
         start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),

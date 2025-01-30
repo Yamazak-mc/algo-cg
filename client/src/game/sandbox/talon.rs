@@ -118,6 +118,39 @@ impl SpawnCards for Real {
     }
 }
 
+pub struct Map<S, F> {
+    spawner: S,
+    map_fn: F,
+}
+
+impl<S, F> Map<S, F>
+where
+    S: SpawnCards + 'static,
+    F: FnMut((usize, CardView)) -> CardView,
+{
+    #[allow(unused)]
+    pub fn new(spawner: S, map_fn: F) -> Self {
+        Self { spawner, map_fn }
+    }
+}
+
+impl<S, F> SpawnCards for Map<S, F>
+where
+    S: SpawnCards + 'static,
+    F: FnMut((usize, CardView)) -> CardView,
+{
+    fn produce_cards(&mut self) -> Vec<CardView> {
+        self.spawner
+            .produce_cards()
+            .into_iter()
+            .rev()
+            .enumerate()
+            .map(&mut self.map_fn)
+            .rev()
+            .collect()
+    }
+}
+
 fn spawn_cards_impl<'a, 'w, 's, T>(
     cards: T,
     commands: &'a mut Commands<'w, 's>,
