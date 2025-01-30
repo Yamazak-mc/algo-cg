@@ -13,6 +13,6 @@ fn update_name(
     for (entity, card) in &query {
         commands
             .entity(entity)
-            .insert(Name::new(format!("Card-{}", **card)));
+            .insert(Name::new(format!("Card-{}", card.get())));
     }
 }

@@ -22,7 +22,7 @@ pub struct SpawnCardTag;
 impl SpawnCardTag {
     fn handle_trigger(trigger: Trigger<Self>, mut commands: Commands, query: Query<&CardInstance>) {
         let card_entity = trigger.entity();
-        let card = query.get(card_entity).unwrap();
+        let card = query.get(card_entity).unwrap().get();
         if card.pub_info.revealed || card.priv_info.is_none() {
             return;
         }

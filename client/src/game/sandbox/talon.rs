@@ -48,6 +48,12 @@ pub trait SpawnCards {
     }
 }
 
+impl SpawnCards for Vec<CardView> {
+    fn produce_cards(&mut self) -> Vec<CardView> {
+        self.iter().cloned().rev().collect()
+    }
+}
+
 pub struct Messy {
     size: u8,
     rng: ThreadRng,
@@ -92,14 +98,6 @@ pub struct SingleVariant {
 impl SpawnCards for SingleVariant {
     fn produce_cards(&mut self) -> Vec<CardView> {
         std::iter::repeat_n(self.card, self.size as usize).collect()
-    }
-}
-
-pub struct Fixed(pub Vec<CardView>);
-
-impl SpawnCards for Fixed {
-    fn produce_cards(&mut self) -> Vec<CardView> {
-        self.0.iter().rev().cloned().collect()
     }
 }
 
@@ -164,7 +162,11 @@ where
         transform.translation.y += i as f32 * CARD_DEPTH;
 
         let id = commands
-            .spawn((StateScoped(AppState::Game), CardInstance(card), transform))
+            .spawn((
+                StateScoped(AppState::Game),
+                CardInstance::new(card),
+                transform,
+            ))
             .id();
 
         id

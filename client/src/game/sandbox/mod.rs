@@ -1,41 +1,37 @@
 use super::{
-    card::{flip_animation::CardFlipAnimation, instance::CardInstance, picking::PickableCard},
+    card::{
+        instance::{self as card_instance, CardInstance},
+        picking::PickableCard,
+    },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
 use crate::AppState;
-use algo_core::player::PlayerId;
+use algo_core::{card::CardPrivInfo, player::PlayerId};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use client::utils::observe_once::{ObserveOnce, ObserveOncePlugin};
 
 mod talon;
-use client::utils::observe_once::{ObserveOnce, ObserveOncePlugin};
-use talon::SandboxTalon;
+use talon::{SandboxTalon, SpawnCards as _};
 
 mod camera_control;
 use camera_control::SandboxCameraControlPlugin;
 
 pub fn game_sandbox_plugin(app: &mut App) {
-    let card_spawner = talon::Map::new(talon::Real, |(i, mut card)| {
-        if i % 2 == 1 {
-            card.priv_info = None;
-        }
-        card
-    });
-
     app.add_plugins((
         SandboxCameraControlPlugin {
             ctx_state: GameMode::Sandbox,
         },
         ObserveOncePlugin::<Pointer<Click>>::new(),
     ))
-    .insert_non_send_resource(SandboxTalon::new(card_spawner))
+    .insert_non_send_resource(Option::<SandboxTalon>::None)
     .add_systems(
         Update,
         start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),
     )
     .add_systems(
         OnEnter(GameMode::Sandbox),
-        (setup_game_sandbox, setup_game_sandbox_2).chain(),
+        (init_sandbox_resources, setup_sandbox, setup_sandbox_2).chain(),
     );
 }
 
@@ -47,13 +43,27 @@ fn start_sandbox(
     game_mode.set(GameMode::Sandbox);
 }
 
-fn setup_game_sandbox(mut commands: Commands, mut talon: NonSendMut<SandboxTalon>) {
-    // My field
-    let self_player = PlayerId::dummy();
-    let opponent_player = PlayerId::dummy_2();
+#[derive(Deref, DerefMut, Resource)]
+struct CardPrivInfos(Vec<CardPrivInfo>);
 
+fn init_sandbox_resources(mut commands: Commands, mut talon: NonSendMut<Option<SandboxTalon>>) {
+    let mut cards = talon::Real.produce_cards();
+    let priv_infos = cards
+        .iter_mut()
+        .map(|v| v.priv_info.take().unwrap())
+        .rev()
+        .collect();
+
+    *talon = Some(SandboxTalon::new(cards));
+
+    commands.insert_resource(CardPrivInfos(priv_infos));
+}
+
+fn setup_sandbox(mut commands: Commands, mut talon: NonSendMut<Option<SandboxTalon>>) {
+    let (self_player, opponent_player) = (PlayerId::dummy(), PlayerId::dummy_2());
     let card_field_z = CARD_HEIGHT * (1.0 + CARD_Z_GAP_RATIO) * 2.0;
 
+    // My field
     commands.spawn((
         StateScoped(AppState::Game),
         MyCardField,
@@ -69,25 +79,26 @@ fn setup_game_sandbox(mut commands: Commands, mut talon: NonSendMut<SandboxTalon
     ));
 
     // Initialize the talon
-    talon.init(
+    (*talon).as_mut().unwrap().init(
         &mut commands,
         Transform::from_translation(TALON_TRANSLATION),
     );
 
-    commands.spawn(PlayerIdCycle(Box::new(
-        [self_player, opponent_player].into_iter().cycle(),
-    )));
+    commands.spawn((
+        StateScoped(GameMode::Sandbox),
+        PlayerIdCycle(Box::new([self_player, opponent_player].into_iter().cycle())),
+    ));
 }
 
 // This function is separated from `setup_game_sandbox`
 // to ensure that updates to `Children` are properly applied
 // before calling `setup_talon_top`.
-fn setup_game_sandbox_2(
+fn setup_sandbox_2(
     mut commands: Commands,
-    mut talon: NonSendMut<SandboxTalon>,
+    mut talon: NonSendMut<Option<SandboxTalon>>,
     children: Query<&Children>,
 ) {
-    setup_talon_top(&mut talon, &mut commands, &children);
+    setup_talon_top((*talon).as_mut().unwrap(), &mut commands, &children);
 }
 
 #[derive(Component, Deref, DerefMut)]
@@ -113,13 +124,20 @@ fn on_click_talon_top(
     mut commands: Commands,
     mut target_player: Single<&mut PlayerIdCycle>,
     mut card_fields: Query<(Entity, &mut CardField, &CardFieldOwnedBy)>,
-    mut talon: NonSendMut<SandboxTalon>,
+    mut talon: NonSendMut<Option<SandboxTalon>>,
+    mut priv_infos: ResMut<CardPrivInfos>,
     children: Query<&Children>,
 ) {
     let card_entity = trigger.entity();
-    let card = cards.get(card_entity).unwrap();
+    let card = *cards.get(card_entity).unwrap().get();
+
+    commands.trigger_targets(
+        card_instance::AddPrivInfo(priv_infos.pop().unwrap()),
+        card_entity,
+    );
 
     // Update talon state
+    let talon = (*talon).as_mut().unwrap();
     talon.draw_card();
 
     // If the card is facing down, add a new observer
@@ -140,29 +158,20 @@ fn on_click_talon_top(
     field.insert_card(field_entity, 0, card_entity, &mut commands);
 
     // Prepare next talon top
-    setup_talon_top(&mut talon, &mut commands, &children);
+    setup_talon_top(talon, &mut commands, &children);
 }
 
 fn reveal_card(
     trigger: Trigger<Pointer<Click>>,
-    mut cards: Query<(&mut CardInstance, &Children)>,
+    children: Query<&Children>,
     mut commands: Commands,
-    animation: Res<CardFlipAnimation>,
-    mut animation_player: Query<&mut AnimationPlayer>,
 ) {
     let entity = trigger.entity();
-    let (mut card, children) = cards.get_mut(entity).unwrap();
 
-    // Update card state
-    card.pub_info.revealed = true;
-    commands.entity(children[0]).remove::<PickableCard>();
-
-    // Animation
+    // Remove picking interaction
     commands
-        .entity(children[0])
-        .insert(animation.animation_target);
-    animation_player
-        .get_mut(animation.animation_target.player)
-        .unwrap()
-        .start(animation.node_idx);
+        .entity(children.get(entity).unwrap()[0])
+        .remove::<PickableCard>();
+
+    commands.trigger_targets(card_instance::Reveal, entity);
 }
