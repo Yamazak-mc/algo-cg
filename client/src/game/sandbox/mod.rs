@@ -60,7 +60,7 @@ fn init_sandbox_resources(mut commands: Commands, mut talon: NonSendMut<Option<S
 }
 
 fn setup_sandbox(mut commands: Commands, mut talon: NonSendMut<Option<SandboxTalon>>) {
-    let (self_player, opponent_player) = (PlayerId::dummy(), PlayerId::dummy_2());
+    let (self_player, opponent_player) = PlayerId::dummy_pair();
     let card_field_z = CARD_HEIGHT * (1.0 + CARD_Z_GAP_RATIO) * 2.0;
 
     // My field

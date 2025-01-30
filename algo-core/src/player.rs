@@ -16,13 +16,8 @@ impl From<u32> for PlayerId {
 
 impl PlayerId {
     #[allow(unused)]
-    pub fn dummy() -> Self {
-        Self(101)
-    }
-
-    #[allow(unused)]
-    pub fn dummy_2() -> Self {
-        Self(102)
+    pub fn dummy_pair() -> (Self, Self) {
+        (Self(101), Self(102))
     }
 }
 
