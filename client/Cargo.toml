@@ -16,6 +16,7 @@ fontdue = "0.9.2"
 image = "0.25.5"
 protocol = { path = "../protocol" }
 serde = { workspace = true }
+slab = "0.4.9"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { version = "0.7.13", features = ["full"] }

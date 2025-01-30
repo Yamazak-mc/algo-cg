@@ -13,6 +13,7 @@ use algo_core::player::PlayerId;
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 mod talon;
+use client::utils::observe_once::{ObserveOnce, ObserveOncePlugin};
 use talon::SandboxTalon;
 
 mod camera_control;
@@ -26,9 +27,12 @@ pub fn game_sandbox_plugin(app: &mut App) {
         card
     });
 
-    app.add_plugins(SandboxCameraControlPlugin {
-        ctx_state: GameMode::Sandbox,
-    })
+    app.add_plugins((
+        SandboxCameraControlPlugin {
+            ctx_state: GameMode::Sandbox,
+        },
+        ObserveOncePlugin::<Pointer<Click>>::new(),
+    ))
     .insert_non_send_resource(SandboxTalon::new(card_spawner))
     .add_systems(
         Update,
@@ -94,20 +98,15 @@ fn setup_game_sandbox_2(
 #[derive(Component, Deref, DerefMut)]
 struct PlayerIdCycle(Box<dyn Iterator<Item = PlayerId> + Send + Sync + 'static>);
 
-#[derive(Debug, Clone, Copy, Component)]
-struct TalonTop {
-    observer: Entity,
-}
-
 fn setup_talon_top(talon: &mut SandboxTalon, commands: &mut Commands, children: &Query<&Children>) {
     let Some(talon_top) = talon.peek_card() else {
         return;
     };
 
-    let observer = commands
-        .spawn(Observer::new(on_click_talon_top).with_entity(talon_top))
-        .id();
-    commands.entity(talon_top).insert(TalonTop { observer });
+    commands.trigger_targets(
+        ObserveOnce::<Pointer<Click>>::new(Observer::new(on_click_talon_top)),
+        talon_top,
+    );
 
     let children = children.get(talon_top).unwrap();
     commands.entity(children[0]).insert(PickableCard);
@@ -115,7 +114,7 @@ fn setup_talon_top(talon: &mut SandboxTalon, commands: &mut Commands, children: 
 
 fn on_click_talon_top(
     trigger: Trigger<Pointer<Click>>,
-    talon_top: Single<(&TalonTop, &CardInstance)>,
+    cards: Query<&CardInstance>,
     mut commands: Commands,
     mut target_player: Single<&mut PlayerIdCycle>,
     mut card_fields: Query<(Entity, &mut CardField, &CardFieldOwnedBy)>,
@@ -123,64 +122,48 @@ fn on_click_talon_top(
     children: Query<&Children>,
 ) {
     let card_entity = trigger.entity();
-
-    // DEBUG
-    commands.trigger_targets(SpawnCardTag, card_entity);
+    let card = cards.get(card_entity).unwrap();
 
     // Update talon state
     talon.draw_card();
-    commands.entity(talon_top.0.observer).despawn_recursive();
-    commands.entity(card_entity).remove::<TalonTop>();
+
+    // Update card state
+    commands.trigger_targets(SpawnCardTag, card_entity); // DEBUG
 
     // If the card is facing down, add a new observer
-    if !talon_top.1.pub_info.revealed {
+    if !card.pub_info.revealed {
         // TODO: Block the user from clicking this card while animating.
-        let observer = commands
-            .spawn(Observer::new(reveal_card).with_entity(card_entity))
-            .id();
-        commands.entity(card_entity).insert(Revealable { observer });
+        commands.trigger_targets(
+            ObserveOnce::<Pointer<Click>>::new(Observer::new(reveal_card)),
+            card_entity,
+        );
     }
 
-    // Get target card field
+    // Insert card into the field
     let target_player = target_player.next().unwrap();
-    let Some((field_entity, mut field, _)) = card_fields
+    let (field_entity, mut field, _) = card_fields
         .iter_mut()
         .find(|(_, _, owner)| owner.0 == target_player)
-    else {
-        warn!("failed to find card field target");
-        return;
-    };
-
-    // Insert card into the field
+        .unwrap();
     field.insert_card(field_entity, 0, card_entity, &mut commands);
 
     // Prepare next talon top
     setup_talon_top(&mut talon, &mut commands, &children);
 }
 
-#[derive(Debug, Clone, Copy, Component)]
-struct Revealable {
-    observer: Entity,
-}
-
 fn reveal_card(
     trigger: Trigger<Pointer<Click>>,
-    mut card: Query<(&mut CardInstance, &Revealable, &Children)>,
+    mut cards: Query<(&mut CardInstance, &Children)>,
     mut commands: Commands,
     animation: Res<CardFlipAnimation>,
     mut animation_player: Query<&mut AnimationPlayer>,
 ) {
     let entity = trigger.entity();
-    let (mut card, revealable, children) = card.get_mut(entity).unwrap();
+    let (mut card, children) = cards.get_mut(entity).unwrap();
 
-    // Cleanup observer
-    commands.entity(revealable.observer).despawn();
-    // The card is no longer Pickable.
-    commands.entity(entity).remove::<Revealable>();
-    commands.entity(children[0]).remove::<PickableCard>();
-
-    // Update state
+    // Update card state
     card.pub_info.revealed = true;
+    commands.entity(children[0]).remove::<PickableCard>();
     commands.trigger_targets(DespawnCardTag, entity); // DEBUG
 
     // Animation
