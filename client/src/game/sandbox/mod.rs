@@ -1,10 +1,5 @@
 use super::{
-    card::{
-        flip_animation::CardFlipAnimation,
-        instance::CardInstance,
-        picking::PickableCard,
-        tag::{DespawnCardTag, SpawnCardTag},
-    },
+    card::{flip_animation::CardFlipAnimation, instance::CardInstance, picking::PickableCard},
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
@@ -127,9 +122,6 @@ fn on_click_talon_top(
     // Update talon state
     talon.draw_card();
 
-    // Update card state
-    commands.trigger_targets(SpawnCardTag, card_entity); // DEBUG
-
     // If the card is facing down, add a new observer
     if !card.pub_info.revealed {
         // TODO: Block the user from clicking this card while animating.
@@ -164,7 +156,6 @@ fn reveal_card(
     // Update card state
     card.pub_info.revealed = true;
     commands.entity(children[0]).remove::<PickableCard>();
-    commands.trigger_targets(DespawnCardTag, entity); // DEBUG
 
     // Animation
     commands

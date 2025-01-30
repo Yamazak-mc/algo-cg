@@ -1,11 +1,9 @@
 use super::instance::CardInstance;
-use crate::AppState;
+use crate::game::CTX_STATE;
 use bevy::prelude::*;
 
 pub fn card_name_plugin(app: &mut App) {
-    let ctx_state = AppState::Game;
-
-    app.add_systems(Update, update_name.run_if(in_state(ctx_state)));
+    app.add_systems(Update, update_name.run_if(in_state(CTX_STATE)));
 }
 
 fn update_name(

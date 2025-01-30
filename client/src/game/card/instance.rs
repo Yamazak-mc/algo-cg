@@ -1,4 +1,8 @@
-use super::{material::CardMaterials, mesh::CardMesh};
+use super::{
+    material::CardMaterials,
+    mesh::CardMesh,
+    tag::{DespawnCardTag, SpawnCardTag},
+};
 use crate::game::CTX_STATE;
 use algo_core::card::CardView;
 use bevy::prelude::*;
@@ -6,7 +10,8 @@ use client::utils::add_observer_ext::AddStateScopedObserver as _;
 use std::f32::consts::PI;
 
 pub fn card_instance_plugin(app: &mut App) {
-    app.add_state_scoped_observer(CTX_STATE, CardInstance::init);
+    app.add_systems(Update, CardInstance::on_change.run_if(in_state(CTX_STATE)))
+        .add_state_scoped_observer(CTX_STATE, CardInstance::init);
 }
 
 /// The main card component.
@@ -77,5 +82,17 @@ impl CardInstance {
             MeshMaterial3d(material_handle),
             Transform::from_rotation(rotation),
         )
+    }
+
+    fn on_change(mut commands: Commands, cards: Query<(Entity, &Self), Changed<Self>>) {
+        for (entity, card) in &cards {
+            if card.priv_info.is_some() {
+                if card.pub_info.revealed {
+                    commands.trigger_targets(DespawnCardTag, entity);
+                } else {
+                    commands.trigger_targets(SpawnCardTag, entity);
+                }
+            }
+        }
     }
 }
