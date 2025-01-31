@@ -1,12 +1,13 @@
 use anyhow::Context as _;
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResized};
 
 pub fn world_to_2d_plugin(app: &mut App) {
     app.register_type::<(Followed, FollowOffsets)>()
         .add_systems(Update, Followed::update)
         .add_observer(AddFollower::handle_trigger)
         .add_observer(DespawnFollower::handle_trigger)
-        .add_systems(Update, handle_camera_movement);
+        .add_systems(Update, handle_camera_movement)
+        .add_systems(Update, handle_window_resize);
 }
 
 #[derive(Clone, Copy, Event)]
@@ -119,7 +120,20 @@ fn handle_camera_movement(
         return;
     }
 
-    for mut owner in &mut params.p1() {
+    flag_transforms(params.p1());
+}
+
+fn handle_window_resize(
+    events: EventReader<WindowResized>,
+    owners: Query<&mut Transform, With<Followed>>,
+) {
+    if !events.is_empty() {
+        flag_transforms(owners);
+    }
+}
+
+fn flag_transforms<'a>(mut transforms: Query<&mut Transform, With<Followed>>) {
+    for mut owner in &mut transforms {
         // Perform `DerefMut` to trigger the `Changed<Transform>` query filter.
         let _: &mut Transform = &mut owner;
     }
