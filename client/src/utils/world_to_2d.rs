@@ -132,7 +132,7 @@ fn handle_window_resize(
     }
 }
 
-fn flag_transforms<'a>(mut transforms: Query<&mut Transform, With<Followed>>) {
+fn flag_transforms(mut transforms: Query<&mut Transform, With<Followed>>) {
     for mut owner in &mut transforms {
         // Perform `DerefMut` to trigger the `Changed<Transform>` query filter.
         let _: &mut Transform = &mut owner;
