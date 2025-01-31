@@ -4,10 +4,11 @@ use bevy::{prelude::*, window::WindowResized};
 pub fn world_to_2d_plugin(app: &mut App) {
     app.register_type::<(Followed, FollowOffsets)>()
         .add_systems(Update, Followed::update)
+        .add_observer(UpdatePos::handle_trigger)
         .add_observer(AddFollower::handle_trigger)
         .add_observer(DespawnFollower::handle_trigger)
         .add_systems(Update, handle_camera_movement)
-        .add_systems(Update, handle_window_resize);
+        .add_systems(PostUpdate, handle_window_resize);
 }
 
 #[derive(Clone, Copy, Event)]
@@ -37,6 +38,8 @@ impl AddFollower {
         commands
             .entity(follower)
             .insert(Follower { _target: target });
+
+        commands.trigger_targets(UpdatePos, target);
     }
 }
 
@@ -73,11 +76,29 @@ pub struct FollowOffsets {
 
 impl Followed {
     fn update(
-        camera: Option<Single<(&Camera, &GlobalTransform), With<Camera3d>>>,
+        mut commands: Commands,
         targets: Query<
-            (&Followed, &FollowOffsets, &Transform),
-            Or<(Changed<Transform>, Changed<FollowOffsets>)>,
+            Entity,
+            (
+                With<Followed>,
+                Or<(Changed<Transform>, Changed<FollowOffsets>)>,
+            ),
         >,
+    ) {
+        for target in &targets {
+            commands.trigger_targets(UpdatePos, target);
+        }
+    }
+}
+
+#[derive(Event)]
+struct UpdatePos;
+
+impl UpdatePos {
+    fn handle_trigger(
+        trigger: Trigger<Self>,
+        query: Query<(&Followed, &FollowOffsets, &Transform)>,
+        camera: Option<Single<(&Camera, &GlobalTransform), With<Camera3d>>>,
         mut followers: Query<&mut Transform, Without<Followed>>,
     ) {
         let Some(camera) = camera else {
@@ -85,22 +106,18 @@ impl Followed {
         };
         let (camera, camera_transform) = *camera;
 
-        for (target, offsets, target_transform) in &targets {
-            let Ok(pos2d) = world_to_2d_pos(
-                camera,
-                camera_transform,
-                target_transform.translation + offsets.offset_3d,
-            ) else {
-                return;
-            };
+        let entity = trigger.entity();
+        let (target, offsets, target_transform) = query.get(entity).unwrap();
 
-            let Ok(mut transform) = followers.get_mut(target.follower) else {
-                warn!("detected an invalid FollowerTarget state");
-                continue;
-            };
+        let Ok(pos2d) = world_to_2d_pos(
+            camera,
+            camera_transform,
+            target_transform.translation + offsets.offset_3d,
+        ) else {
+            return;
+        };
 
-            transform.translation = pos2d + offsets.offset_2d;
-        }
+        followers.get_mut(target.follower).unwrap().translation = pos2d + offsets.offset_2d;
     }
 }
 
