@@ -3,10 +3,7 @@
 // #![allow(unused)]
 // #![warn(unused_mut, unused_must_use)]
 
-use bevy::{
-    log::{self, LogPlugin},
-    prelude::*,
-};
+use bevy::prelude::*;
 use bevy_simple_text_input::TextInputPlugin;
 use client::utils::log_display::log_display_plugin;
 
