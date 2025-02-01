@@ -50,7 +50,7 @@ impl Game {
             bail!("duplicated PlayerId: {:?}", player_ids.0);
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let mut talon: Talon = settings.clone().build_cards()?.into_iter().collect();
         if talon.len() <= settings.initial_draw_num as usize * 2 {
