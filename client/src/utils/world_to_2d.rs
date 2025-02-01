@@ -107,7 +107,7 @@ impl UpdatePos {
         let (camera, camera_transform) = *camera;
 
         let entity = trigger.entity();
-        let (target, offsets, target_transform) = query.get(entity).unwrap();
+        let (target, offsets, target_transform) = query.get(entity).unwrap(); // TODO: Check panics
 
         let Ok(pos2d) = world_to_2d_pos(
             camera,
