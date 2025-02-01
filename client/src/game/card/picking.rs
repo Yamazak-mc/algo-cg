@@ -31,14 +31,14 @@ impl Default for PickableCardSettings {
 }
 
 impl PickableCard {
-    fn init(trigger: Trigger<OnAdd, PickableCard>, mut commands: Commands) {
+    fn init(trigger: Trigger<OnAdd, Self>, mut commands: Commands) {
         commands
             .entity(trigger.entity())
             .observe(Self::pointer_over)
             .observe(Self::pointer_out);
     }
 
-    fn cleanup(trigger: Trigger<OnRemove, PickableCard>, mut commands: Commands) {
+    fn cleanup(trigger: Trigger<OnRemove, Self>, mut commands: Commands) {
         commands.entity(trigger.entity()).remove::<(
             RayCastPickable,
             PickableCardSettings,

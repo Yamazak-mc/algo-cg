@@ -1,12 +1,18 @@
 use super::{
-    card::{instance as card_instance, picking::PickableCard},
+    card::{
+        guessing::NumSelected,
+        instance::{self as card_instance},
+        picking::PickableCard,
+    },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
-use crate::AppState;
+use crate::{game::card::guessing::SpawnNumSelector, AppState};
 use algo_core::{card::CardPrivInfo, player::PlayerId};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
-use client::utils::observer_controller::{self, ObserveOnce, ObserverControllerPlugin};
+use client::utils::observer_controller::{
+    self, ObserveOnce, ObserverControllerPlugin, ObserverControllerSettings,
+};
 
 mod talon;
 use talon::{SandboxTalon, SpawnCards as _};
@@ -19,7 +25,7 @@ pub fn game_sandbox_plugin(app: &mut App) {
         SandboxCameraControlPlugin {
             ctx_state: GameMode::Sandbox,
         },
-        ObserverControllerPlugin::<Pointer<Click>>::new(),
+        ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once()),
     ))
     .insert_non_send_resource(Option::<SandboxTalon>::None)
     .add_systems(
@@ -45,6 +51,14 @@ struct CardPrivInfos(Vec<CardPrivInfo>);
 
 fn init_sandbox_resources(mut commands: Commands, mut talon: NonSendMut<Option<SandboxTalon>>) {
     let mut cards = talon::Real.produce_cards();
+
+    // DEBUG
+    // let mut cards = ["White-(100)", "White-(1)", "Black-(100)", "Black-(0)"]
+    //     .into_iter()
+    //     .map(|v| v.parse().unwrap())
+    //     .collect::<Vec<_>>()
+    //     .produce_cards();
+
     let priv_infos = cards
         .iter_mut()
         .map(|v| v.priv_info.take().unwrap())
@@ -142,6 +156,7 @@ fn on_click_talon_top(
 
     match my_card_field {
         Some(_) => {
+            commands.entity(card_entity).insert(MyCard);
             commands.trigger_targets(
                 card_instance::AddPrivInfo(priv_infos.pop().unwrap()),
                 card_entity,
@@ -153,6 +168,9 @@ fn on_click_talon_top(
             );
         }
         None => {
+            commands
+                .entity(card_entity)
+                .insert((OpponentCard, Selectable));
             commands.trigger_targets(
                 observer_controller::Insert::<Pointer<Click>>::new_active(|| {
                     Observer::new(select_card_number)
@@ -170,6 +188,15 @@ fn on_click_talon_top(
     setup_talon_top(talon, &mut commands, &children);
 }
 
+#[derive(Component)]
+struct MyCard;
+
+#[derive(Component)]
+struct OpponentCard;
+
+#[derive(Component)]
+struct Selectable;
+
 fn reveal_card(
     trigger: Trigger<Pointer<Click>>,
     children: Query<&Children>,
@@ -185,6 +212,53 @@ fn reveal_card(
     commands.trigger_targets(card_instance::Reveal, entity);
 }
 
-fn select_card_number(_trigger: Trigger<Pointer<Click>>) {
-    // TODO
+fn select_card_number(
+    trigger: Trigger<Pointer<Click>>,
+    mut commands: Commands,
+    selectable_cards: Query<(Entity, Option<&Name>), With<Selectable>>,
+    children: Query<&Children>,
+) {
+    let selected = trigger.entity();
+
+    // Block interaction with other cards
+    for (entity, name) in selectable_cards.iter().filter(|e| e.0 != selected) {
+        debug!("blocking interaction: ID={}, name={:?}", entity, name);
+        commands.trigger_targets(observer_controller::Pause::<Pointer<Click>>::new(), entity);
+    }
+
+    // Remove interaction
+    commands.trigger_targets(
+        observer_controller::Remove::<Pointer<Click>>::new(),
+        selected,
+    );
+    commands.entity(selected).remove::<Selectable>();
+    commands
+        .entity(children.get(selected).unwrap()[0])
+        .remove::<PickableCard>();
+
+    // Spawn NumSelector
+    commands.trigger_targets(SpawnNumSelector, selected);
+    commands.trigger_targets(
+        ObserveOnce::<NumSelected>::new(Observer::new(num_selected)),
+        selected,
+    );
+}
+
+fn num_selected(
+    trigger: Trigger<NumSelected>,
+    mut commands: Commands,
+    selectable_cards: Query<Entity, With<Selectable>>,
+) {
+    let entity = trigger.entity();
+    let num = trigger.event().0;
+
+    // Activate interaction with other cards
+    for entity in &selectable_cards {
+        commands.trigger_targets(
+            observer_controller::Activate::<Pointer<Click>>::new(),
+            entity,
+        );
+    }
+
+    commands.trigger_targets(card_instance::RevealWith(CardPrivInfo::new(num)), entity);
 }

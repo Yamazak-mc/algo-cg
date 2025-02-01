@@ -25,9 +25,52 @@ macro_rules! impl_marker_newtype {
     };
 }
 
-pub struct ObserverControllerPlugin<E, B = ()>(PhantomData<fn(&E, &B)>);
+#[derive(Debug, Clone, Copy)]
+pub struct ObserverControllerSettings {
+    pub removable: bool,
+    pub pausable: bool,
+    pub once: bool,
+}
 
-impl_marker_newtype! { ObserverControllerPlugin }
+impl ObserverControllerSettings {
+    pub fn once() -> Self {
+        Self {
+            removable: false,
+            pausable: false,
+            once: true,
+        }
+    }
+}
+
+impl Default for ObserverControllerSettings {
+    fn default() -> Self {
+        Self {
+            removable: true,
+            pausable: true,
+            once: true,
+        }
+    }
+}
+
+pub struct ObserverControllerPlugin<E, B = ()> {
+    settings: ObserverControllerSettings,
+    _marker: PhantomData<fn(&E, &B)>,
+}
+
+impl<E, B> Default for ObserverControllerPlugin<E, B> {
+    fn default() -> Self {
+        Self::new(ObserverControllerSettings::default())
+    }
+}
+
+impl<E, B> ObserverControllerPlugin<E, B> {
+    pub fn new(settings: ObserverControllerSettings) -> Self {
+        Self {
+            settings,
+            _marker: PhantomData,
+        }
+    }
+}
 
 impl<E, B> Plugin for ObserverControllerPlugin<E, B>
 where
@@ -35,8 +78,21 @@ where
     B: Bundle,
 {
     fn build(&self, app: &mut App) {
-        ObserverController::<E, B>::plugin(app);
-        ObserveOnce::<E, B>::plugin(app);
+        let ObserverControllerSettings {
+            removable,
+            pausable,
+            once,
+        } = self.settings;
+
+        if removable {
+            ObserverController::<E, B>::minimal_plugin(app);
+            if pausable {
+                ObserverController::<E, B>::pausable_plugin(app);
+            }
+        }
+        if once {
+            ObserveOnce::<E, B>::plugin(app);
+        }
     }
 }
 
@@ -52,11 +108,12 @@ where
     E: Event,
     B: Bundle,
 {
-    fn plugin(app: &mut App) {
-        app.add_observer(Self::insert)
-            .add_observer(Self::remove)
-            .add_observer(Self::activate)
-            .add_observer(Self::pause);
+    fn minimal_plugin(app: &mut App) {
+        app.add_observer(Self::insert).add_observer(Self::remove);
+    }
+
+    fn pausable_plugin(app: &mut App) {
+        app.add_observer(Self::activate).add_observer(Self::pause);
     }
 
     fn insert(mut trigger: Trigger<Insert<E, B>>, mut commands: Commands) {
@@ -81,6 +138,10 @@ where
         let entity = trigger.entity();
 
         if let Some(observer_entity) = query.get_mut(entity).unwrap().observer_entity.take() {
+            debug!(
+                "removing observer: observer={}, target={}",
+                observer_entity, entity
+            );
             commands.entity(observer_entity).despawn();
         }
 
@@ -96,7 +157,14 @@ where
         let mut this = query.get_mut(entity).unwrap();
 
         if this.observer_entity.is_none() {
-            this.observer_entity = Some(commands.spawn((this.observer_fn)()).id());
+            let observer_entity = commands
+                .spawn((this.observer_fn)().with_entity(entity))
+                .id();
+            debug!(
+                "activating observer: observer={}, target={}",
+                observer_entity, entity
+            );
+            this.observer_entity = Some(observer_entity);
         }
     }
 
@@ -105,6 +173,10 @@ where
         let mut this = query.get_mut(entity).unwrap();
 
         if let Some(observer_entity) = this.observer_entity.take() {
+            debug!(
+                "pausing observer: observer={}, target={}",
+                observer_entity, entity
+            );
             commands.entity(observer_entity).despawn();
         }
     }

@@ -1,7 +1,10 @@
 use crate::AppState;
 use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
-use client::utils::{animate_once::AnimateOncePlugin, world_to_2d::world_to_2d_plugin};
+use client::utils::{
+    animate_once::AnimateOncePlugin, observer_controller::ObserverControllerPlugin,
+    world_to_2d::world_to_2d_plugin,
+};
 
 mod card;
 use card::CardPlugins;
@@ -28,7 +31,7 @@ const CARD_Z_GAP_RATIO: f32 = 0.1;
 
 const CARD_WIDTH_PLUS_GAP: f32 = CARD_WIDTH * (1.0 + CARD_X_GAP_RATIO);
 
-const TALON_TRANSLATION: Vec3 = Vec3::new(0.0, CARD_DEPTH / 2.0, 0.0);
+const TALON_TRANSLATION: Vec3 = Vec3::new(2.0, CARD_DEPTH / 2.0, 0.0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
 #[source(AppState = AppState::Game)]
@@ -44,6 +47,7 @@ pub fn game_plugin(app: &mut App) {
         .add_plugins((
             InfiniteGridPlugin,
             AnimateOncePlugin::from_state(AppState::Game),
+            ObserverControllerPlugin::<Pointer<Click>>::default(),
             world_to_2d_plugin,
             CardPlugins {
                 card_size: CARD_SIZE,

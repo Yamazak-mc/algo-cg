@@ -24,6 +24,7 @@ tokio-util = { version = "0.7.13", features = ["full"] }
 # for sandbox, debugging
 bevy_dev_tools = "0.15.1"
 bevy-inspector-egui = "0.29.1"
+# bevy_remote_inspector = "0.1.0"
 rand = { workspace = true }
 itertools = { workspace = true }
 

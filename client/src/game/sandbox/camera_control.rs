@@ -68,7 +68,7 @@ fn show_control_info(mut commands: Commands) {
                 key_name(KEY_TOGGLE_MSG),
             ),
         )),
-        Visibility::Visible,
+        Visibility::Hidden,
     ));
 }
 

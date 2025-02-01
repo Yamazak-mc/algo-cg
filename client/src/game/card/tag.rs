@@ -8,8 +8,8 @@ use client::utils::{
 
 const FONT_SIZE: f32 = 32.0;
 
-const TAG_3D_OFFSET: Vec3 = Vec3::new(0.0, 0.0, -CARD_HEIGHT / 2.0);
-const TAG_2D_OFFSET: Vec3 = Vec3::new(0.0, FONT_SIZE * 0.75, 0.0);
+const TAG_3D_OFFSET: Vec3 = Vec3::new(0.0, 0.0, CARD_HEIGHT / 2.0);
+const TAG_2D_OFFSET: Vec3 = Vec3::new(0.0, -FONT_SIZE * 0.75, 0.0);
 
 pub fn card_tag_plugin(app: &mut App) {
     app.add_state_scoped_observer(CTX_STATE, SpawnCardTag::handle_trigger)
@@ -44,6 +44,7 @@ impl SpawnCardTag {
             },
             card_entity,
         );
+        commands.entity(card_entity).insert(HasCardTag);
     }
 }
 
@@ -51,9 +52,14 @@ impl SpawnCardTag {
 pub struct DespawnCardTag;
 
 impl DespawnCardTag {
-    fn handle_trigger(trigger: Trigger<Self>, mut commands: Commands) {
+    fn handle_trigger(trigger: Trigger<Self>, query: Query<&HasCardTag>, mut commands: Commands) {
         let card_entity = trigger.entity();
-
-        commands.trigger_targets(DespawnFollower, card_entity);
+        if query.get(card_entity).is_ok() {
+            commands.trigger_targets(DespawnFollower, card_entity);
+            commands.entity(card_entity).remove::<HasCardTag>();
+        }
     }
 }
+
+#[derive(Component)]
+pub struct HasCardTag;

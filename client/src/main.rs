@@ -3,7 +3,10 @@
 // #![allow(unused)]
 // #![warn(unused_mut, unused_must_use)]
 
-use bevy::prelude::*;
+use bevy::{
+    log::{self, LogPlugin},
+    prelude::*,
+};
 use bevy_simple_text_input::TextInputPlugin;
 use client::utils::log_display::log_display_plugin;
 
@@ -35,6 +38,7 @@ fn main() {
 
     App::new()
         .add_plugins(DefaultPlugins)
+        // .add_plugins(bevy_remote_inspector::RemoteInspectorPlugins)
         .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new())
         .add_plugins(TextInputPlugin)
         .add_plugins(log_display_plugin)

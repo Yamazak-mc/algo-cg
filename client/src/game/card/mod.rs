@@ -4,6 +4,7 @@ use bevy::{
 };
 
 pub mod flip_animation;
+pub mod guessing;
 pub mod instance;
 pub mod material;
 pub mod mesh;
@@ -25,6 +26,7 @@ impl PluginGroup for CardPlugins {
             .add(material::card_material_plugin)
             .add(tag::card_tag_plugin)
             .add(picking::card_picking_plugin)
+            .add(guessing::card_guessing_plugin)
             .add(flip_animation::card_flip_plugin)
             .add(name::card_name_plugin)
     }
