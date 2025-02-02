@@ -1,4 +1,4 @@
-use super::add_observer_ext::AddStateScopedObserver as _;
+use super::AddObserverExt as _;
 use bevy::{
     animation::{animated_field, AnimationTarget, AnimationTargetId},
     prelude::*,

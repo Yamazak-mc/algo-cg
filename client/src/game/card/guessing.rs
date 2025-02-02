@@ -1,13 +1,7 @@
-use crate::{
-    game::{CARD_HEIGHT, CTX_STATE},
-    AppState,
-};
+use crate::{game::CTX_STATE, AppState};
 use algo_core::card::CardNumber;
 use bevy::prelude::*;
-use client::utils::{
-    add_observer_ext::AddStateScopedObserver as _,
-    world_to_2d::{AddFollower, DespawnFollower},
-};
+use client::utils::AddObserverExt as _;
 
 const PANEL_SIZE: Vec2 = Vec2::new(360.0, 200.0);
 
@@ -67,10 +61,11 @@ impl SpawnNumSelector {
             PANEL_SIZE.y * (button_h_plus_gap_p - gap_p.y),
         );
 
-        let selector_entity = commands
+        commands
             .spawn((
                 StateScoped(NumSelectorState::Selecting),
                 Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, 0.5), PANEL_SIZE),
+                Transform::from_xyz(0.0, -80.0, 0.0),
                 Name::new("NumSelector"),
             ))
             .with_children(|parent| {
@@ -105,17 +100,16 @@ impl SpawnNumSelector {
                             });
                     }
                 }
-            })
-            .id();
+            });
 
-        commands.trigger_targets(
-            AddFollower {
-                follower: selector_entity,
-                offset_3d: Vec3::new(0.0, 0.0, CARD_HEIGHT * 3.0),
-                offset_2d: Vec3::new(0.0, 0.0, 0.0),
-            },
-            card_entity,
-        );
+        // commands.trigger_targets(
+        //     AddFollower {
+        //         follower: selector_entity,
+        //         offset_3d: Vec3::new(0.0, 0.0, CARD_HEIGHT * 3.0),
+        //         offset_2d: Vec3::new(0.0, 0.0, 0.0),
+        //     },
+        //     card_entity,
+        // );
 
         next_state.set(NumSelectorState::Selecting);
     }
@@ -173,7 +167,7 @@ impl NumSelectorButton {
             NumSelected(buttons.get(trigger.entity()).unwrap().output),
             target,
         );
-        commands.trigger_targets(DespawnFollower, target);
+        // commands.trigger_targets(DespawnFollower, target);
 
         next_state.set(NumSelectorState::Inactive);
     }

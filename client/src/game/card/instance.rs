@@ -7,7 +7,7 @@ use super::{
 use crate::game::CTX_STATE;
 use algo_core::card::{CardPrivInfo, CardView};
 use bevy::prelude::*;
-use client::utils::add_observer_ext::AddStateScopedObserver as _;
+use client::utils::AddObserverExt as _;
 use std::f32::consts::PI;
 
 pub fn card_instance_plugin(app: &mut App) {

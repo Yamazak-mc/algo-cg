@@ -2,8 +2,8 @@ use super::instance::CardInstance;
 use crate::game::{CARD_HEIGHT, CTX_STATE};
 use bevy::prelude::*;
 use client::utils::{
-    add_observer_ext::AddStateScopedObserver as _,
     world_to_2d::{AddFollower, DespawnFollower},
+    AddObserverExt as _,
 };
 
 const FONT_SIZE: f32 = 32.0;

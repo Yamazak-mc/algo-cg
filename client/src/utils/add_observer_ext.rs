@@ -1,6 +1,6 @@
 use bevy::{ecs::system::IntoObserverSystem, prelude::*};
 
-pub trait AddStateScopedObserver {
+pub trait AddObserverExt {
     fn add_state_scoped_observer<S, E, B, M, I>(&mut self, state: S, observer: I) -> &mut Self
     where
         S: States,
@@ -9,7 +9,7 @@ pub trait AddStateScopedObserver {
         I: IntoObserverSystem<E, B, M> + Sync + Clone;
 }
 
-impl AddStateScopedObserver for App {
+impl AddObserverExt for App {
     fn add_state_scoped_observer<S, E, B, M, I>(&mut self, state: S, observer: I) -> &mut Self
     where
         S: States,

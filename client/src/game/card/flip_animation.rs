@@ -3,7 +3,7 @@ use bevy::{
     animation::{animated_field, AnimationTarget, AnimationTargetId},
     prelude::*,
 };
-use client::utils::add_observer_ext::AddStateScopedObserver as _;
+use client::utils::AddObserverExt as _;
 use std::f32::consts::PI;
 
 const FLIP_ANIMATION_DURATION_SECS: f32 = 0.5;

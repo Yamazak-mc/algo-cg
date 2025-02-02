@@ -47,7 +47,7 @@ pub fn game_plugin(app: &mut App) {
         .add_plugins((
             InfiniteGridPlugin,
             AnimateOncePlugin::from_state(AppState::Game),
-            ObserverControllerPlugin::<Pointer<Click>>::default(),
+            ObserverControllerPlugin::<Pointer<Click>>::default().state_scoped(AppState::Game),
             world_to_2d_plugin,
             CardPlugins {
                 card_size: CARD_SIZE,

@@ -1,7 +1,7 @@
 use crate::game::CTX_STATE;
 use bevy::prelude::*;
 use bevy_mod_outline::{OutlineMode, OutlinePlugin, OutlineVolume};
-use client::utils::add_observer_ext::AddStateScopedObserver as _;
+use client::utils::AddObserverExt as _;
 
 pub fn card_picking_plugin(app: &mut App) {
     app.add_plugins((MeshPickingPlugin, OutlinePlugin))

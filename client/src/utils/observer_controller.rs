@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
+use super::AddObserverExt as _;
+
 macro_rules! impl_marker_newtype {
     ($ty:ident $(,)?) => {
         impl<E, B> $ty<E, B>
@@ -70,6 +72,13 @@ impl<E, B> ObserverControllerPlugin<E, B> {
             _marker: PhantomData,
         }
     }
+
+    pub fn state_scoped<S: States>(self, state: S) -> ObserverControllerPluginStateScoped<E, B, S> {
+        ObserverControllerPluginStateScoped {
+            plugin: self,
+            state,
+        }
+    }
 }
 
 impl<E, B> Plugin for ObserverControllerPlugin<E, B>
@@ -96,6 +105,40 @@ where
     }
 }
 
+pub struct ObserverControllerPluginStateScoped<E, B, S>
+where
+    S: States,
+{
+    plugin: ObserverControllerPlugin<E, B>,
+    state: S,
+}
+
+impl<E, B, S> Plugin for ObserverControllerPluginStateScoped<E, B, S>
+where
+    E: Event,
+    B: Bundle,
+    S: States + Clone,
+{
+    fn build(&self, app: &mut App) {
+        let ObserverControllerSettings {
+            removable,
+            pausable,
+            once,
+        } = self.plugin.settings;
+        let state = &self.state;
+
+        if removable {
+            ObserverController::<E, B>::minimal_plugin_state_scoped(app, state.clone());
+            if pausable {
+                ObserverController::<E, B>::pausable_plugin_state_scoped(app, state.clone());
+            }
+        }
+        if once {
+            ObserveOnce::<E, B>::plugin_state_scoped(app, state.clone());
+        }
+    }
+}
+
 #[derive(Component)]
 struct ObserverController<E, B> {
     observer_fn: Box<dyn Fn() -> Observer + Send + Sync + 'static>,
@@ -114,6 +157,16 @@ where
 
     fn pausable_plugin(app: &mut App) {
         app.add_observer(Self::activate).add_observer(Self::pause);
+    }
+
+    fn minimal_plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
+        app.add_state_scoped_observer(state.clone(), Self::insert)
+            .add_state_scoped_observer(state, Self::remove);
+    }
+
+    fn pausable_plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
+        app.add_state_scoped_observer(state.clone(), Self::activate)
+            .add_state_scoped_observer(state, Self::remove);
     }
 
     fn insert(mut trigger: Trigger<Insert<E, B>>, mut commands: Commands) {
@@ -262,6 +315,11 @@ where
     fn plugin(app: &mut App) {
         app.add_observer(Self::handle_trigger)
             .add_observer(Self::cleanup);
+    }
+
+    fn plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
+        app.add_state_scoped_observer(state.clone(), Self::handle_trigger)
+            .add_state_scoped_observer(state, Self::cleanup);
     }
 
     fn handle_trigger(mut trigger: Trigger<Self>, mut commands: Commands) {

@@ -1,7 +1,7 @@
 use crate::AppState;
 use algo_core::player::PlayerId;
 use bevy::prelude::*;
-use client::utils::{add_observer_ext::AddStateScopedObserver as _, animate_once::AnimateOnce};
+use client::utils::{animate_once::AnimateOnce, AddObserverExt as _};
 
 use super::CARD_WIDTH_PLUS_GAP;
 

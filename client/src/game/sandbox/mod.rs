@@ -25,7 +25,8 @@ pub fn game_sandbox_plugin(app: &mut App) {
         SandboxCameraControlPlugin {
             ctx_state: GameMode::Sandbox,
         },
-        ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once()),
+        ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once())
+            .state_scoped(GameMode::Sandbox),
     ))
     .insert_non_send_resource(Option::<SandboxTalon>::None)
     .add_systems(

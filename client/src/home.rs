@@ -11,10 +11,10 @@ use client::{
         OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
     },
     utils::{
-        add_observer_ext::AddStateScopedObserver,
         button::{button_system, spawn_common_button, ButtonPressed},
         into_color::IntoColor,
         log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
+        AddObserverExt as _,
     },
 };
 use protocol::server_to_client::JoinInfo;
