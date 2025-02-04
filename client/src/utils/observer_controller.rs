@@ -166,7 +166,7 @@ where
 
     fn pausable_plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
         app.add_state_scoped_observer(state.clone(), Self::activate)
-            .add_state_scoped_observer(state, Self::remove);
+            .add_state_scoped_observer(state, Self::pause);
     }
 
     fn insert(mut trigger: Trigger<Insert<E, B>>, mut commands: Commands) {
