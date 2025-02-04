@@ -5,6 +5,7 @@ use super::{
         picking::PickableCard,
     },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
+    dialog::{Dialog, DialogButton},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
 use crate::{game::card::guessing::SpawnNumSelector, AppState};
@@ -54,6 +55,10 @@ enum MyTurnState {
     Attack,
     AttackSucceeded,
     AttackFailed,
+    CheckWinCondition,
+    ChooseAttackOrStay,
+    Stay,
+    Win,
 }
 
 pub fn game_sandbox_plugin(app: &mut App) {
@@ -98,6 +103,16 @@ pub fn game_sandbox_plugin(app: &mut App) {
     .add_systems(OnEnter(MyTurnState::Attack), on_enter_my_attack)
     .add_systems(OnEnter(MyTurnState::AttackSucceeded), attack_succeeded)
     .add_systems(OnEnter(MyTurnState::AttackFailed), attack_failed)
+    .add_systems(OnEnter(MyTurnState::CheckWinCondition), check_win_condition)
+    .add_systems(
+        OnEnter(MyTurnState::ChooseAttackOrStay),
+        choose_attack_or_stay,
+    )
+    .add_systems(OnEnter(MyTurnState::Stay), on_enter_stay)
+    // DEBUG
+    .add_systems(OnEnter(MyTurnState::Win), |mut commands: Commands| {
+        commands.set_state(AppState::Home);
+    })
     // DEBUG
     .add_systems(
         Update,
@@ -479,8 +494,7 @@ fn attack_succeeded(
         attacked,
     );
 
-    // TODO
-    commands.trigger(SetTimeout::new(0.5).with_state(MyTurnState::Attack));
+    commands.trigger(SetTimeout::new(0.5).with_state(MyTurnState::CheckWinCondition));
 }
 
 fn attack_failed(
@@ -503,4 +517,61 @@ fn attack_failed(
 
     // Pass a turn to the opponent after the animation
     commands.trigger(SetTimeout::new(1.0).with_state(SandboxState::OpponentTurn));
+}
+
+fn check_win_condition(
+    field: Single<&CardField, Without<MyCardField>>,
+    cards: Query<&CardInstance>,
+    mut my_turn_state: ResMut<NextState<MyTurnState>>,
+) {
+    let all_revealed = field
+        .cards()
+        .iter()
+        .all(|entity| cards.get(*entity).unwrap().get().pub_info.revealed);
+
+    my_turn_state.set(if all_revealed {
+        MyTurnState::Win
+    } else {
+        MyTurnState::ChooseAttackOrStay
+    });
+}
+
+fn choose_attack_or_stay(mut commands: Commands) {
+    commands.spawn((
+        Dialog::new(
+            None,
+            [
+                DialogButton::new(
+                    "Attack",
+                    |commands| commands.set_state(MyTurnState::Attack),
+                    default(),
+                ),
+                DialogButton::new(
+                    "Stay",
+                    |commands| commands.set_state(MyTurnState::Stay),
+                    default(),
+                ),
+            ],
+        ),
+        Transform::from_xyz(0.0, -80.0, 0.0),
+    ));
+}
+
+fn on_enter_stay(
+    mut commands: Commands,
+    attacker: Single<Entity, With<Attacker>>,
+    field: Single<Entity, With<MyCardField>>,
+) {
+    commands.entity(*attacker).remove::<Attacker>();
+
+    // Insert the card into the field without flipping it
+    commands.trigger(SetTimeout::new(0.5).with_trigger_targets(
+        InsertCardToField {
+            card_entity: *attacker,
+        },
+        *field,
+    ));
+
+    // Pass a turn to the opponent after the animation
+    commands.trigger(SetTimeout::new(0.5).with_state(SandboxState::OpponentTurn));
 }

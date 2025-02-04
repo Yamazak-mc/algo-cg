@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use client::utils::AddObserverExt as _;
 
 const PANEL_SIZE: Vec2 = Vec2::new(360.0, 200.0);
+const PANEL_TRANSLATION: Vec3 = Vec3::new(0.0, -80.0, 0.0);
 
 const ITEMS_PER_ROW: u8 = 6;
 const ITEMS_PER_COL: u8 = 2;
@@ -65,7 +66,7 @@ impl SpawnNumSelector {
             .spawn((
                 StateScoped(NumSelectorState::Selecting),
                 Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, 0.5), PANEL_SIZE),
-                Transform::from_xyz(0.0, -80.0, 0.0),
+                Transform::from_translation(PANEL_TRANSLATION),
                 Name::new("NumSelector"),
             ))
             .with_children(|parent| {

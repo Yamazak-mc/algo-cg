@@ -42,6 +42,7 @@ fn setup_attacker_fields(
     settings: Res<AttackerSettings>,
 ) {
     commands.spawn((
+        StateScoped(SANDBOX_CTX_STATE),
         MyAttackerField,
         AttackerFieldOwnedBy(players.self_player),
         settings.my_attacker_xf,
@@ -49,6 +50,7 @@ fn setup_attacker_fields(
     ));
 
     commands.spawn((
+        StateScoped(SANDBOX_CTX_STATE),
         OpponentAttackerField,
         AttackerFieldOwnedBy(players.opponent_player),
         settings.opponent_attacker_xf,
@@ -79,6 +81,8 @@ impl AddAttacker {
                 .unwrap()
                 .0
         };
+
+        // TODO: Refactor using `commands.entity(e).trigger(event)`
         commands.trigger_targets(
             AnimateTransform::new(attacker_field_xf, 0.5, EaseFunction::QuarticOut),
             attacker_entity,

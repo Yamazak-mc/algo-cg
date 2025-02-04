@@ -39,6 +39,10 @@ impl CardField {
 
         self.cards.insert(idx as usize, entity);
     }
+
+    pub fn cards(&self) -> &[Entity] {
+        &self.cards
+    }
 }
 
 #[derive(Debug, Component)]

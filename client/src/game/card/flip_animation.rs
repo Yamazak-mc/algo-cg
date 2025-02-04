@@ -55,6 +55,7 @@ fn setup_animation(
         .spawn((
             AnimationPlayer::default(),
             AnimationGraphHandle(graph_handle),
+            Name::new("CardFlipAnimationPlayer"),
         ))
         .id();
 

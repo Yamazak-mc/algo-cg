@@ -12,6 +12,9 @@ use card::CardPlugins;
 mod card_field;
 use card_field::card_field_plugin;
 
+mod dialog;
+use dialog::dialog_plugin;
+
 // DEBUG
 mod sandbox;
 use sandbox::game_sandbox_plugin;
@@ -53,14 +56,16 @@ pub fn game_plugin(app: &mut App) {
                 card_size: CARD_SIZE,
             },
             card_field_plugin,
+            dialog_plugin,
             game_sandbox_plugin, // DEBUG
         ))
-        .add_systems(OnEnter(AppState::Game), setup_game);
+        .add_systems(OnEnter(CTX_STATE), setup_game);
 }
 
 fn setup_game(mut commands: Commands) {
     // camera
     commands.spawn((
+        StateScoped(CTX_STATE),
         Camera3d::default(),
         Camera {
             order: 0,
@@ -75,10 +80,13 @@ fn setup_game(mut commands: Commands) {
     ));
 
     // grid
-    commands.spawn(InfiniteGridBundle {
-        settings: InfiniteGridSettings { ..default() },
-        ..default()
-    });
+    commands.spawn((
+        StateScoped(CTX_STATE),
+        InfiniteGridBundle {
+            settings: InfiniteGridSettings { ..default() },
+            ..default()
+        },
+    ));
 
     // lights
     commands.insert_resource(AmbientLight {
@@ -86,6 +94,7 @@ fn setup_game(mut commands: Commands) {
         brightness: 250.0,
     });
     commands.spawn((
+        StateScoped(CTX_STATE),
         PointLight {
             shadows_enabled: true,
             ..default()

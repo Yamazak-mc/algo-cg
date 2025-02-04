@@ -29,6 +29,7 @@ impl SpawnCardTag {
 
         let tag_entity = commands
             .spawn((
+                StateScoped(CTX_STATE),
                 Text2d(format!("{}", card.priv_info.unwrap().number.0)),
                 TextFont::from_font_size(FONT_SIZE),
                 // DEBUG

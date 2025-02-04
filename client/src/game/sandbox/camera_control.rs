@@ -50,6 +50,7 @@ struct CameraControlInfo;
 
 fn show_control_info(mut commands: Commands) {
     commands.spawn((
+        StateScoped(SANDBOX_CTX_STATE),
         CameraControlInfo,
         Text(format!(
             "[Camera]\n  Move: {} {} {} {}\n  Zoom: {} {}\nRotate: {} {}\n Reset: {}\n\n{}",
