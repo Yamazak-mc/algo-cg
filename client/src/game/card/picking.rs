@@ -10,8 +10,57 @@ pub fn card_picking_plugin(app: &mut App) {
 }
 
 #[derive(Component)]
-#[require(RayCastPickable, OutlineMode(|| OutlineMode::FloodFlat), PickableCardSettings)]
+struct PickingObservers {
+    over: Entity,
+    out: Entity,
+}
+
+#[derive(Component)]
 pub struct PickableCard;
+
+impl PickableCard {
+    fn init(trigger: Trigger<OnAdd, Self>, mut commands: Commands, children: Query<&Children>) {
+        let child = children.get(trigger.entity()).unwrap()[0];
+
+        let over = commands
+            .spawn(Observer::new(PickableCard__::pointer_over).with_entity(child))
+            .id();
+        let out = commands
+            .spawn(Observer::new(PickableCard__::pointer_out).with_entity(child))
+            .id();
+
+        commands
+            .entity(child)
+            .insert((PickableCard__, PickingObservers { over, out }));
+    }
+
+    fn cleanup(
+        trigger: Trigger<OnRemove, Self>,
+        mut commands: Commands,
+        children: Query<&Children>,
+        observers_query: Query<&PickingObservers>,
+    ) {
+        let child = children.get(trigger.entity()).unwrap()[0];
+
+        if let Ok(observers) = observers_query.get(child) {
+            commands.entity(observers.over).despawn();
+            commands.entity(observers.out).despawn();
+
+            commands.entity(child).remove::<(
+                PickableCard__,
+                RayCastPickable,
+                PickableCardSettings,
+                OutlineMode,
+                OutlineVolume,
+                PickingObservers,
+            )>();
+        }
+    }
+}
+
+#[derive(Component)]
+#[require(RayCastPickable, OutlineMode(|| OutlineMode::FloodFlat), PickableCardSettings)]
+struct PickableCard__;
 
 #[derive(Clone, Component)]
 pub struct PickableCardSettings {
@@ -30,23 +79,7 @@ impl Default for PickableCardSettings {
     }
 }
 
-impl PickableCard {
-    fn init(trigger: Trigger<OnAdd, Self>, mut commands: Commands) {
-        commands
-            .entity(trigger.entity())
-            .observe(Self::pointer_over)
-            .observe(Self::pointer_out);
-    }
-
-    fn cleanup(trigger: Trigger<OnRemove, Self>, mut commands: Commands) {
-        commands.entity(trigger.entity()).remove::<(
-            RayCastPickable,
-            PickableCardSettings,
-            OutlineMode,
-            OutlineVolume,
-        )>();
-    }
-
+impl PickableCard__ {
     fn pointer_over(
         trigger: Trigger<Pointer<Over>>,
         mut volume: Query<&mut OutlineVolume>,

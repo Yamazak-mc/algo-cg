@@ -20,10 +20,12 @@ impl<T: States + Clone> Plugin for AnimateOncePlugin<T> {
     fn build(&self, app: &mut App) {
         if let Some(ref state) = self.target_state {
             app.add_state_scoped_observer(state.clone(), AnimateOnce::handle_trigger)
-                .add_state_scoped_observer(state.clone(), AnimateOnce::cleanup);
+                .add_state_scoped_observer(state.clone(), AnimateOnce::cleanup)
+                .add_state_scoped_observer(state.clone(), AnimateTransform::handle_trigger);
         } else {
             app.add_observer(AnimateOnce::handle_trigger)
-                .add_observer(AnimateOnce::cleanup);
+                .add_observer(AnimateOnce::cleanup)
+                .add_observer(AnimateTransform::handle_trigger);
         }
     }
 }
@@ -130,5 +132,42 @@ impl AnimateOnce {
         commands
             .entity(trigger.entity())
             .remove::<(AnimationTarget, AnimationGraphHandle, AnimationPlayer)>();
+    }
+}
+
+#[derive(Clone, Copy, Event)]
+pub struct AnimateTransform {
+    pub end: Transform,
+    pub duration_secs: f32,
+    pub ease_fn: EaseFunction,
+}
+
+impl AnimateTransform {
+    pub fn new(end: Transform, duration_secs: f32, ease_fn: EaseFunction) -> Self {
+        Self {
+            end,
+            duration_secs,
+            ease_fn,
+        }
+    }
+
+    fn handle_trigger(
+        trigger: Trigger<Self>,
+        transforms: Query<&Transform>,
+        mut commands: Commands,
+    ) {
+        let entity = trigger.entity();
+        let Self {
+            end,
+            duration_secs,
+            ease_fn,
+        } = *trigger.event();
+
+        let transform = *transforms.get(entity).unwrap();
+
+        commands.trigger_targets(
+            AnimateOnce::translation_and_rotation(transform, end, duration_secs, ease_fn),
+            entity,
+        );
     }
 }

@@ -5,6 +5,8 @@ use bevy::{
 };
 use std::f32::consts::FRAC_PI_8;
 
+use super::SANDBOX_CTX_STATE;
+
 const KEY_FORWARD: KeyCode = KeyCode::KeyW;
 const KEY_BACK: KeyCode = KeyCode::KeyS;
 const KEY_LEFT: KeyCode = KeyCode::KeyA;
@@ -18,13 +20,11 @@ const KEY_RESET_XF: KeyCode = KeyCode::KeyQ;
 const KEY_PRINT_XF: KeyCode = KeyCode::KeyP;
 const KEY_TOGGLE_MSG: KeyCode = KeyCode::KeyM;
 
-pub struct SandboxCameraControlPlugin<T> {
-    pub ctx_state: T,
-}
+pub struct SandboxCameraControlPlugin;
 
-impl<T: States + Clone> Plugin for SandboxCameraControlPlugin<T> {
+impl Plugin for SandboxCameraControlPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(self.ctx_state.clone()), show_control_info)
+        app.add_systems(OnEnter(SANDBOX_CTX_STATE), show_control_info)
             .add_systems(
                 Update,
                 (
@@ -40,7 +40,7 @@ impl<T: States + Clone> Plugin for SandboxCameraControlPlugin<T> {
                     print_camera_transform.run_if(input_just_pressed(KEY_PRINT_XF)),
                     toggle_control_msg.run_if(input_just_pressed(KEY_TOGGLE_MSG)),
                 )
-                    .run_if(in_state(self.ctx_state.clone())),
+                    .run_if(in_state(SANDBOX_CTX_STATE)),
             );
     }
 }
