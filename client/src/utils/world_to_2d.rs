@@ -27,19 +27,20 @@ impl AddFollower {
             offset_2d,
         } = *trigger.event();
 
-        commands.entity(target).insert((
-            Followed { follower },
-            FollowOffsets {
-                offset_2d,
-                offset_3d,
-            },
-        ));
+        commands
+            .entity(target)
+            .insert((
+                Followed { follower },
+                FollowOffsets {
+                    offset_2d,
+                    offset_3d,
+                },
+            ))
+            .trigger(UpdatePos);
 
         commands
             .entity(follower)
             .insert(Follower { _target: target });
-
-        commands.trigger_targets(UpdatePos, target);
     }
 }
 

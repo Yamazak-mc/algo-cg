@@ -163,11 +163,11 @@ impl NumSelectorButton {
         mut commands: Commands,
     ) {
         let target = *target;
-        commands.entity(target).remove::<NumSelectorTarget>();
-        commands.trigger_targets(
-            NumSelected(buttons.get(trigger.entity()).unwrap().output),
-            target,
-        );
+        commands
+            .entity(target)
+            .remove::<NumSelectorTarget>()
+            .trigger(NumSelected(buttons.get(trigger.entity()).unwrap().output));
+
         // commands.trigger_targets(DespawnFollower, target);
 
         next_state.set(NumSelectorState::Inactive);

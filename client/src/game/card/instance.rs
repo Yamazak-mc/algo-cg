@@ -237,8 +237,10 @@ impl RevealWith {
         card.pub_info.revealed = true;
         card.priv_info = Some(trigger.event().0);
 
-        commands.trigger_targets(UpdateMaterial(*card), entity);
-        commands.trigger_targets(FlipCard, entity);
+        commands
+            .entity(entity)
+            .trigger(UpdateMaterial(*card))
+            .trigger(FlipCard);
     }
 }
 

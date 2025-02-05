@@ -70,7 +70,6 @@ impl AddAttacker {
         mut commands: Commands,
     ) {
         let attacker_entity = trigger.entity();
-        commands.entity(attacker_entity).insert(Attacker);
 
         // Animate transform
         let attacker_field_xf = {
@@ -82,11 +81,14 @@ impl AddAttacker {
                 .0
         };
 
-        // TODO: Refactor using `commands.entity(e).trigger(event)`
-        commands.trigger_targets(
-            AnimateTransform::new(attacker_field_xf, 0.5, EaseFunction::QuarticOut),
-            attacker_entity,
-        );
+        commands
+            .entity(attacker_entity)
+            .insert(Attacker)
+            .trigger(AnimateTransform::new(
+                attacker_field_xf,
+                0.5,
+                EaseFunction::QuarticOut,
+            ));
     }
 }
 

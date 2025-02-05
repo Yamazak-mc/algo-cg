@@ -318,21 +318,18 @@ impl DistributeCard {
         let priv_info = priv_infos.pop().unwrap();
         match my_card_field {
             true => {
-                commands.entity(card_entity).insert(MyCard);
-                commands.trigger_targets(card_instance::AddPrivInfo(priv_info), card_entity);
+                commands
+                    .entity(card_entity)
+                    .insert(MyCard)
+                    .trigger(card_instance::AddPrivInfo(priv_info));
             }
             false => {
-                commands.entity(card_entity).insert((
-                    OpponentCard,
-                    HiddenCardPrivInfo(priv_info),
-                    Selectable,
-                ));
-                commands.trigger_targets(
-                    observer_controller::Insert::<Pointer<Click>>::new_paused(|| {
-                        Observer::new(attack_target_selected) // TODO
-                    }),
-                    card_entity,
-                );
+                commands
+                    .entity(card_entity)
+                    .insert((OpponentCard, HiddenCardPrivInfo(priv_info), Selectable))
+                    .trigger(observer_controller::Insert::<Pointer<Click>>::new_paused(
+                        || Observer::new(attack_target_selected),
+                    ));
             }
         }
 
@@ -391,12 +388,12 @@ fn setup_draw(mut commands: Commands, mut talon: NonSendMut<Option<SandboxTalon>
         return;
     };
 
-    commands.trigger_targets(
-        ObserveOnce::<Pointer<Click>>::new(Observer::new(on_click_talon_top)),
-        talon_top,
-    );
-
-    commands.entity(talon_top).insert(PickableCard);
+    commands
+        .entity(talon_top)
+        .insert(PickableCard)
+        .trigger(ObserveOnce::<Pointer<Click>>::new(Observer::new(
+            on_click_talon_top,
+        )));
 }
 
 // `Pointer<Click>` is triggered on the child entity of `CardInstance` by `mesh_picking` backend.
@@ -454,27 +451,25 @@ fn on_enter_my_attack(
 fn attack_target_selected(
     trigger: Trigger<Pointer<Click>>,
     mut commands: Commands,
-    selectable_cards: Query<(Entity, Option<&Name>), With<Selectable>>,
+    selectable_cards: Query<Entity, With<Selectable>>,
     attacker: Single<Entity, With<Attacker>>,
 ) {
     let selected = trigger.entity();
 
     // Block interaction
-    for (entity, name) in &selectable_cards {
-        debug!("blocking interaction: ID={}, name={:?}", entity, name);
-        commands.trigger_targets(observer_controller::Pause::<Pointer<Click>>::new(), entity);
-        commands.entity(entity).remove::<PickableCard>();
+    for entity in &selectable_cards {
+        commands
+            .entity(entity)
+            .remove::<PickableCard>()
+            .trigger(observer_controller::Pause::<Pointer<Click>>::new());
     }
 
-    // Spawn NumSelector
-    commands.trigger_targets(SpawnNumSelector, selected);
-    commands.trigger_targets(
-        ObserveOnce::<NumSelected>::new(Observer::new(num_selected)),
-        selected,
-    );
-
-    // Mark attack target
-    commands.entity(selected).insert(AttackTarget);
+    // Spawn NumSelector for the selected target
+    commands
+        .entity(selected)
+        .insert(AttackTarget)
+        .trigger(SpawnNumSelector)
+        .trigger(ObserveOnce::<NumSelected>::new(Observer::new(num_selected)));
 
     // Move Attacker
     commands.trigger_targets(
@@ -508,17 +503,13 @@ fn attack_succeeded(
     let (attacked, hidden_info) = *attacked;
 
     // Update the attacked card
-    commands.trigger_targets(
-        card_instance::RevealWith(CardPrivInfo::new(hidden_info.0.number)),
-        attacked,
-    );
     commands
         .entity(attacked)
-        .remove::<(HiddenCardPrivInfo, Selectable)>();
-    commands.trigger_targets(
-        observer_controller::Remove::<Pointer<Click>>::new(),
-        attacked,
-    );
+        .remove::<(HiddenCardPrivInfo, Selectable)>()
+        .trigger(card_instance::RevealWith(CardPrivInfo::new(
+            hidden_info.0.number,
+        )))
+        .trigger(observer_controller::Remove::<Pointer<Click>>::new());
 
     commands.trigger(SetTimeout::new(0.5).with_state(MyTurnState::CheckWinCondition));
 }
@@ -528,10 +519,11 @@ fn attack_failed(
     attacker: Single<Entity, With<Attacker>>,
     field: Single<Entity, With<MyCardField>>,
 ) {
-    commands.entity(*attacker).remove::<Attacker>();
-
     // Flip the card
-    commands.trigger_targets(card_instance::Reveal, *attacker);
+    commands
+        .entity(*attacker)
+        .remove::<Attacker>()
+        .trigger(card_instance::Reveal);
 
     // Then insert
     commands.trigger(SetTimeout::new(0.5).with_trigger_targets(

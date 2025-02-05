@@ -37,15 +37,14 @@ impl SpawnCardTag {
             ))
             .id();
 
-        commands.trigger_targets(
-            AddFollower {
+        commands
+            .entity(card_entity)
+            .insert(HasCardTag)
+            .trigger(AddFollower {
                 follower: tag_entity,
                 offset_3d: TAG_3D_OFFSET,
                 offset_2d: TAG_2D_OFFSET,
-            },
-            card_entity,
-        );
-        commands.entity(card_entity).insert(HasCardTag);
+            });
     }
 }
 
@@ -56,8 +55,10 @@ impl DespawnCardTag {
     fn handle_trigger(trigger: Trigger<Self>, query: Query<&HasCardTag>, mut commands: Commands) {
         let card_entity = trigger.entity();
         if query.get(card_entity).is_ok() {
-            commands.trigger_targets(DespawnFollower, card_entity);
-            commands.entity(card_entity).remove::<HasCardTag>();
+            commands
+                .entity(card_entity)
+                .remove::<HasCardTag>()
+                .trigger(DespawnFollower);
         }
     }
 }
