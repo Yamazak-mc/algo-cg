@@ -25,8 +25,6 @@ use itertools::Itertools as _;
 use rand::{rngs::ThreadRng, seq::IndexedRandom, Rng as _};
 use std::collections::{BTreeMap, BTreeSet};
 
-// TODO: Despawn popup entities by adding `DespawnOnRemove<T: Component>`?
-
 mod talon;
 use talon::{SandboxTalon, SpawnCards as _};
 

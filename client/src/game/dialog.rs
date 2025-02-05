@@ -131,9 +131,9 @@ impl Dialog {
         }
 
         commands.entity(observed_by.0).despawn();
-        commands
-            .entity(entity)
-            .remove::<(Sprite, DialogButtonPressObservedBy)>();
+        // TODO: Allow users choose whether to despawn or not
+        commands.entity(entity).despawn();
+        // .remove::<(Sprite, DialogButtonPressObservedBy)>();
     }
 
     fn calculate_size(&self) -> Vec2 {
