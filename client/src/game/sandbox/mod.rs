@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{game::card::guessing::SpawnNumSelector, AppState};
 use algo_core::{
-    card::{CardColor, CardNumber, CardPrivInfo},
+    card::{CardColor, CardNumber, CardPrivInfo, CardPubInfo},
     player::PlayerId,
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
@@ -22,6 +22,10 @@ use client::utils::{
     AddObserverExt as _,
 };
 use itertools::Itertools as _;
+use rand::{rngs::ThreadRng, seq::IndexedRandom, Rng as _};
+use std::collections::{BTreeMap, BTreeSet};
+
+// TODO: Despawn popup entities by adding `DespawnOnRemove<T: Component>`?
 
 mod talon;
 use talon::{SandboxTalon, SpawnCards as _};
@@ -61,6 +65,20 @@ enum MyTurnState {
     Win,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
+#[source(SandboxState = SandboxState::OpponentTurn)]
+enum OpponentTurnState {
+    #[default]
+    Draw,
+    Attack,
+    AttackSucceeded,
+    AttackFailed,
+    CheckWinCondition,
+    ChooseAttackOrStay,
+    Stay,
+    Win,
+}
+
 pub fn game_sandbox_plugin(app: &mut App) {
     app.add_plugins((
         ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once())
@@ -69,8 +87,7 @@ pub fn game_sandbox_plugin(app: &mut App) {
         SandboxAttackerPlugin {
             settings: AttackerSettings {
                 my_attacker_xf: Transform::from_xyz(0.0, HALF_CARD_DEPTH, 0.0),
-                opponent_attacker_xf: Transform::from_xyz(0.0, HALF_CARD_DEPTH, 0.0)
-                    .looking_to(Vec3::Z, Vec3::Y),
+                opponent_attacker_xf: Transform::from_xyz(0.0, HALF_CARD_DEPTH, 0.0),
             },
         },
     ))
@@ -81,8 +98,10 @@ pub fn game_sandbox_plugin(app: &mut App) {
     .add_sub_state::<SandboxState>()
     .enable_state_scoped_entities::<SandboxState>()
     .add_sub_state::<MyTurnState>()
+    .add_sub_state::<OpponentTurnState>()
     .init_resource::<SandboxPlayers>()
     .insert_non_send_resource(Option::<SandboxTalon>::None)
+    .insert_non_send_resource(OpponentSimulator::new())
     .add_systems(
         OnEnter(GameMode::Sandbox),
         (init_sandbox_resources, setup_sandbox).chain(),
@@ -107,6 +126,29 @@ pub fn game_sandbox_plugin(app: &mut App) {
     )
     .add_systems(OnEnter(MyTurnState::Stay), on_enter_stay)
     .add_systems(OnEnter(MyTurnState::Win), on_enter_win)
+    .add_systems(OnEnter(OpponentTurnState::Draw), opponent_draw)
+    .add_systems(
+        OnEnter(OpponentTurnState::Attack),
+        OpponentSimulator::attack,
+    )
+    .add_systems(
+        OnEnter(OpponentTurnState::AttackSucceeded),
+        opponent_attack_succeeded,
+    )
+    .add_systems(
+        OnEnter(OpponentTurnState::AttackFailed),
+        opponent_attack_failed,
+    )
+    .add_systems(
+        OnEnter(OpponentTurnState::CheckWinCondition),
+        opponent_check_win_condition,
+    )
+    .add_systems(
+        OnEnter(OpponentTurnState::ChooseAttackOrStay),
+        OpponentSimulator::choose_attack_or_stay,
+    )
+    .add_systems(OnEnter(OpponentTurnState::Stay), opponent_stay)
+    .add_systems(OnEnter(OpponentTurnState::Win), opponent_win)
     // DEBUG
     .add_systems(
         Update,
@@ -374,25 +416,17 @@ fn on_click_talon_top(
     let card_entity = (*talon).as_mut().unwrap().draw_card().unwrap();
     debug_assert_eq!(card_entity, trigger.entity());
 
-    // setup attacker
-    commands.trigger_targets(
-        AddAttacker {
+    // Update drawn card
+    commands
+        .entity(card_entity)
+        .insert(MyCard)
+        .trigger(card_instance::AddPrivInfo(priv_infos.pop().unwrap()))
+        .trigger(AddAttacker {
             owner: sandbox_players.self_player,
-        },
-        card_entity,
-    );
-
-    // Add info
-    commands.entity(card_entity).insert(MyCard);
-    commands.trigger_targets(
-        card_instance::AddPrivInfo(priv_infos.pop().unwrap()),
-        card_entity,
-    );
+        })
+        .remove::<PickableCard>();
 
     my_turn_state.set(MyTurnState::Attack);
-
-    // Cleanup
-    commands.entity(card_entity).remove::<PickableCard>();
 }
 
 fn on_enter_my_attack(
@@ -578,7 +612,229 @@ fn on_enter_win(mut commands: Commands) {
             StateScoped(SANDBOX_CTX_STATE),
             Transform::from_xyz(0.0, -80.0, 0.0),
         ))
-        .insert_popup_message("You Won!", duration_secs);
+        .insert_popup_message("You Win!", duration_secs);
 
     commands.trigger(SetTimeout::new(duration_secs).with_state(AppState::Home));
+}
+
+fn opponent_draw(
+    mut commands: Commands,
+    mut talon: NonSendMut<Option<SandboxTalon>>,
+    sandbox_players: Res<SandboxPlayers>,
+    mut priv_infos: ResMut<CardPrivInfos>,
+    mut simulator: NonSendMut<OpponentSimulator>,
+) {
+    let card_entity = (*talon).as_mut().unwrap().draw_card().unwrap();
+
+    commands
+        .entity(card_entity)
+        .insert((OpponentCard, HiddenCardPrivInfo(priv_infos.pop().unwrap())))
+        .trigger(AddAttacker {
+            owner: sandbox_players.opponent_player,
+        });
+
+    simulator.attacker = Some(card_entity);
+
+    commands.trigger(SetTimeout::new(0.5).with_state(OpponentTurnState::Attack));
+}
+
+fn opponent_attack_succeeded(mut simulator: NonSendMut<OpponentSimulator>, mut commands: Commands) {
+    commands.trigger_targets(
+        card_instance::Reveal,
+        simulator.attack_target.take().unwrap(),
+    );
+
+    commands.trigger(SetTimeout::new(0.5).with_state(OpponentTurnState::CheckWinCondition));
+}
+
+fn opponent_attack_failed(
+    mut simulator: NonSendMut<OpponentSimulator>,
+    hidden_infos: Query<(&HiddenCardPrivInfo,)>,
+    mut commands: Commands,
+    field: Single<Entity, (With<CardField>, Without<MyCardField>)>,
+) {
+    let attacker_entity = simulator.attacker.take().unwrap();
+    let number = hidden_infos.get(attacker_entity).unwrap().0.number;
+
+    commands
+        .entity(attacker_entity)
+        .trigger(card_instance::RevealWith(CardPrivInfo::new(number)))
+        .remove::<(Attacker, HiddenCardPrivInfo, Selectable)>();
+
+    commands.trigger_targets(
+        InsertCardToField {
+            card_entity: attacker_entity,
+        },
+        *field,
+    );
+
+    commands.trigger(SetTimeout::new(0.5).with_state(SandboxState::MyTurn));
+}
+
+// TODO: DRY
+fn opponent_check_win_condition(
+    field: Single<&CardField, With<MyCardField>>,
+    cards: Query<&CardInstance>,
+    mut opponent_turn_state: ResMut<NextState<OpponentTurnState>>,
+) {
+    let all_revealed = field
+        .cards()
+        .iter()
+        .all(|entity| cards.get(*entity).unwrap().get().pub_info.revealed);
+
+    opponent_turn_state.set(if all_revealed {
+        OpponentTurnState::Win
+    } else {
+        OpponentTurnState::ChooseAttackOrStay
+    });
+}
+
+fn opponent_stay(
+    mut simulator: NonSendMut<OpponentSimulator>,
+    mut commands: Commands,
+    field: Single<Entity, (With<CardField>, Without<MyCardField>)>,
+) {
+    let attacker_entity = simulator.attacker.take().unwrap();
+
+    commands
+        .entity(attacker_entity)
+        .insert(Selectable)
+        .remove::<Attacker>()
+        .trigger(observer_controller::Insert::<Pointer<Click>>::new_paused(
+            || Observer::new(attack_target_selected),
+        ));
+
+    commands.trigger_targets(
+        InsertCardToField {
+            card_entity: attacker_entity,
+        },
+        *field,
+    );
+
+    commands.trigger(SetTimeout::new(0.5).with_state(SandboxState::MyTurn));
+}
+
+// TODO: DRY
+fn opponent_win(mut commands: Commands) {
+    let duration_secs = 1.0;
+
+    commands
+        .spawn((
+            StateScoped(SANDBOX_CTX_STATE),
+            Transform::from_xyz(0.0, -80.0, 0.0),
+        ))
+        .insert_popup_message("You Lose!", duration_secs);
+
+    commands.trigger(SetTimeout::new(duration_secs).with_state(AppState::Home));
+}
+
+/// This simulator guesses numbers using only the information  
+/// from the cards visible to the simulated player.  
+///
+/// If the guess is correct, there is a 50% chance that the simulator  
+/// will attack again.  
+///
+/// More advanced simulators may also utilize the following information  
+/// for number predictions:  
+/// - The history of actions taken by both players (e.g., guessed numbers)
+struct OpponentSimulator {
+    rng: ThreadRng,
+    attacker: Option<Entity>,
+    attack_target: Option<Entity>,
+}
+
+impl OpponentSimulator {
+    fn new() -> Self {
+        Self {
+            rng: rand::rng(),
+            attacker: None,
+            attack_target: None,
+        }
+    }
+
+    fn attack(
+        mut this: NonSendMut<OpponentSimulator>,
+        mut commands: Commands,
+        cards: Query<(Entity, &CardInstance, Option<&HiddenCardPrivInfo>)>,
+    ) {
+        let mut attack_targets = Vec::new();
+        let mut numbers = BTreeMap::from([
+            (CardColor::Black, BTreeSet::from_iter(0..12)),
+            (CardColor::White, BTreeSet::from_iter(0..12)),
+        ]);
+
+        for (entity, card, hidden_info) in &cards {
+            let card = card.get();
+            let CardPubInfo { color, revealed } = card.pub_info;
+
+            if let Some(hidden_info) = hidden_info {
+                numbers
+                    .get_mut(&color)
+                    .unwrap()
+                    .remove(&hidden_info.number.0);
+            } else if revealed {
+                numbers
+                    .get_mut(&color)
+                    .unwrap()
+                    .remove(&card.priv_info.unwrap().number.0);
+            } else if card.priv_info.is_some() {
+                attack_targets.push((entity, *card));
+            }
+        }
+
+        // Choose attack target;
+        let (attack_target_entity, target_card) = *attack_targets.choose(&mut this.rng).unwrap();
+        commands.trigger_targets(
+            AttackTo {
+                target_card: attack_target_entity,
+            },
+            this.attacker.unwrap(),
+        );
+
+        // Choose number
+        let guess = **numbers
+            .remove(&target_card.pub_info.color)
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>()
+            .choose(&mut this.rng)
+            .unwrap();
+
+        // Announce opponent's guess
+        let msg = format!("Guess: {}", guess);
+        commands.trigger(SetTimeout::new(0.5).with_fn(|commands| {
+            commands
+                .spawn((
+                    StateScoped(SANDBOX_CTX_STATE),
+                    Transform::from_xyz(0.0, -80.0, 0.0),
+                ))
+                .insert_popup_message(msg, 1.0);
+        }));
+
+        // Compare attack result
+        let next_state = if target_card.priv_info.unwrap().number == guess {
+            this.attack_target = Some(attack_target_entity);
+            OpponentTurnState::AttackSucceeded
+        } else {
+            OpponentTurnState::AttackFailed
+        };
+        commands.trigger(SetTimeout::new(1.0).with_state(next_state));
+    }
+
+    fn choose_attack_or_stay(mut this: NonSendMut<OpponentSimulator>, mut commands: Commands) {
+        let (next_state, msg) = if this.rng.random() {
+            (OpponentTurnState::Attack, "Attack Again")
+        } else {
+            (OpponentTurnState::Stay, "Stay")
+        };
+
+        commands
+            .spawn((
+                StateScoped(SANDBOX_CTX_STATE),
+                Transform::from_xyz(0.0, -80.0, 0.0),
+            ))
+            .insert_popup_message(msg, 1.0);
+
+        commands.trigger(SetTimeout::new(0.5).with_state(next_state));
+    }
 }
