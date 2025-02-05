@@ -5,7 +5,7 @@ use super::{
         picking::PickableCard,
     },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
-    dialog::{Dialog, DialogButton},
+    dialog::{Dialog, DialogButton, PopupMessageExt as _},
     GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
 };
 use crate::{game::card::guessing::SpawnNumSelector, AppState};
@@ -18,7 +18,7 @@ use client::utils::{
     observer_controller::{
         self, ObserveOnce, ObserverControllerPlugin, ObserverControllerSettings,
     },
-    set_timeout::{SetTimeout, SetTimeoutPlugin},
+    set_timeout::SetTimeout,
     AddObserverExt as _,
 };
 use itertools::Itertools as _;
@@ -65,9 +65,6 @@ pub fn game_sandbox_plugin(app: &mut App) {
     app.add_plugins((
         ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once())
             .state_scoped(GameMode::Sandbox),
-        SetTimeoutPlugin {
-            ctx_state: GameMode::Sandbox,
-        },
         SandboxCameraControlPlugin,
         SandboxAttackerPlugin {
             settings: AttackerSettings {
@@ -109,10 +106,7 @@ pub fn game_sandbox_plugin(app: &mut App) {
         choose_attack_or_stay,
     )
     .add_systems(OnEnter(MyTurnState::Stay), on_enter_stay)
-    // DEBUG
-    .add_systems(OnEnter(MyTurnState::Win), |mut commands: Commands| {
-        commands.set_state(AppState::Home);
-    })
+    .add_systems(OnEnter(MyTurnState::Win), on_enter_win)
     // DEBUG
     .add_systems(
         Update,
@@ -574,4 +568,17 @@ fn on_enter_stay(
 
     // Pass a turn to the opponent after the animation
     commands.trigger(SetTimeout::new(0.5).with_state(SandboxState::OpponentTurn));
+}
+
+fn on_enter_win(mut commands: Commands) {
+    let duration_secs = 1.0;
+
+    commands
+        .spawn((
+            StateScoped(SANDBOX_CTX_STATE),
+            Transform::from_xyz(0.0, -80.0, 0.0),
+        ))
+        .insert_popup_message("You Won!", duration_secs);
+
+    commands.trigger(SetTimeout::new(duration_secs).with_state(AppState::Home));
 }

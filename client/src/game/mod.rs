@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 use client::utils::{
     animate_once::AnimateOncePlugin, observer_controller::ObserverControllerPlugin,
-    world_to_2d::world_to_2d_plugin,
+    set_timeout::SetTimeoutPlugin, world_to_2d::world_to_2d_plugin,
 };
 
 mod card;
@@ -52,6 +52,9 @@ pub fn game_plugin(app: &mut App) {
             AnimateOncePlugin::from_state(AppState::Game),
             ObserverControllerPlugin::<Pointer<Click>>::default().state_scoped(AppState::Game),
             world_to_2d_plugin,
+            SetTimeoutPlugin {
+                ctx_state: CTX_STATE,
+            },
             CardPlugins {
                 card_size: CARD_SIZE,
             },

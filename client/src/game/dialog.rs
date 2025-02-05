@@ -1,6 +1,6 @@
 use super::CTX_STATE;
 use bevy::prelude::*;
-use client::utils::AddObserverExt;
+use client::utils::{set_timeout::SetTimeout, AddObserverExt};
 
 pub fn dialog_plugin(app: &mut App) {
     app.add_state_scoped_observer(CTX_STATE, Dialog::on_insert)
@@ -214,4 +214,34 @@ fn button_pointer_click(
     let entity = trigger.entity();
     let idx = query.get(entity).unwrap().0;
     commands.entity(entity).trigger(DialogButtonPressed { idx });
+}
+
+pub trait PopupMessageExt {
+    /// Spawns a popup message on the entity.
+    ///
+    /// This function requires [`SetTimeoutPlugin`] and [`dialog_plugin`].
+    ///
+    /// [`SetTimeoutPlugin`]: `client::utils::set_timeout::SetTimeoutPlugin`
+    fn insert_popup_message(&mut self, message: impl Into<String>, duration_secs: f32)
+        -> &mut Self;
+}
+
+impl PopupMessageExt for EntityCommands<'_> {
+    fn insert_popup_message(
+        &mut self,
+        message: impl Into<String>,
+        duration_secs: f32,
+    ) -> &mut Self {
+        let entity = self.id();
+
+        self.insert(Dialog::new(
+            None,
+            [DialogButton::new(message, |_| (), default())],
+        ))
+        .trigger(SetTimeout::new(duration_secs).with_fn(move |commands| {
+            commands.entity(entity).remove::<Dialog>();
+        }));
+
+        self
+    }
 }
