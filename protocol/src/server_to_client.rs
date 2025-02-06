@@ -15,7 +15,41 @@ pub enum ServerToClientEvent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, Event)]
 pub struct JoinInfo {
-    pub player_id: PlayerId,
-    pub join_position: u8,
+    pub joined_player: JoinedPlayerInfo,
     pub room_size: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, Event)]
+pub enum JoinedPlayerInfo {
+    First(PlayerId),
+    Second {
+        just_joined: PlayerId,
+        waiting_player: PlayerId,
+    },
+}
+
+impl JoinedPlayerInfo {
+    pub fn assigned_player_id(&self) -> PlayerId {
+        match self {
+            Self::First(id) => *id,
+            Self::Second { just_joined, .. } => *just_joined,
+        }
+    }
+
+    pub fn waiting_player_id(&self) -> Option<PlayerId> {
+        match self {
+            Self::First(_) => None,
+            Self::Second {
+                just_joined: _,
+                waiting_player,
+            } => Some(*waiting_player),
+        }
+    }
+
+    pub fn join_position(&self) -> u8 {
+        match self {
+            Self::First(_) => 1,
+            Self::Second { .. } => 2,
+        }
+    }
 }

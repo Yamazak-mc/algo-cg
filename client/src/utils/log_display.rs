@@ -149,7 +149,7 @@ impl Message {
         }
     }
 
-    pub fn from_text(message: impl Into<String>) -> Self {
+    pub fn info(message: impl Into<String>) -> Self {
         Self {
             text: message.into(),
             ..default()

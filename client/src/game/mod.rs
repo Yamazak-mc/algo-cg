@@ -15,6 +15,10 @@ use card_field::card_field_plugin;
 mod dialog;
 use dialog::dialog_plugin;
 
+/// Implements 2 players mode.
+mod p2;
+use p2::p2_plugin;
+
 // DEBUG
 mod sandbox;
 use sandbox::game_sandbox_plugin;
@@ -60,6 +64,7 @@ pub fn game_plugin(app: &mut App) {
             },
             card_field_plugin,
             dialog_plugin,
+            p2_plugin,
             game_sandbox_plugin, // DEBUG
         ))
         .add_systems(OnEnter(CTX_STATE), setup_game);

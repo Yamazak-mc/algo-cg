@@ -3,6 +3,7 @@
 // #![allow(unused)]
 // #![warn(unused_mut, unused_must_use)]
 
+use algo_core::player::PlayerId;
 use bevy::prelude::*;
 use bevy_simple_text_input::TextInputPlugin;
 use client::utils::log_display::log_display_plugin;
@@ -34,16 +35,20 @@ fn main() {
     let args: AppArgs = argh::from_env();
 
     App::new()
-        .add_plugins(DefaultPlugins)
-        // .add_plugins(bevy_remote_inspector::RemoteInspectorPlugins)
-        .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new())
-        .add_plugins(TextInputPlugin)
-        .add_plugins(log_display_plugin)
+        .add_plugins((
+            DefaultPlugins,
+            TextInputPlugin,
+            log_display_plugin,
+            home::home_plugin,
+            game::game_plugin,
+            // DEBUG
+            bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
+            // bevy_remote_inspector::RemoteInspectorPlugins
+        ))
         .insert_resource(args)
+        .init_resource::<JoinedPlayers>()
         .insert_state(AppState::Home)
         .enable_state_scoped_entities::<AppState>()
-        .add_plugins(home::home_plugin)
-        .add_plugins(game::game_plugin)
         .add_systems(Startup, setup_camera)
         .run();
 }
@@ -57,4 +62,24 @@ fn setup_camera(mut commands: Commands) {
             ..default()
         },
     ));
+}
+
+#[derive(Debug, Default, Resource)]
+struct JoinedPlayers {
+    my_player: Option<PlayerId>,
+    opponent_player: Option<PlayerId>,
+}
+
+impl JoinedPlayers {
+    fn setup(mut this: ResMut<Self>) {
+        *this = default();
+    }
+
+    fn set_my_player(&mut self, id: PlayerId) {
+        self.my_player = Some(id);
+    }
+
+    fn set_opponent_player(&mut self, id: PlayerId) {
+        self.opponent_player = Some(id);
+    }
 }

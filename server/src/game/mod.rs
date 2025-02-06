@@ -5,7 +5,10 @@ use algo_core::{
     Game, NextEventError,
 };
 use anyhow::{bail, Context as _};
-use protocol::{server_to_client::JoinInfo, WithMetadata};
+use protocol::{
+    server_to_client::{JoinInfo, JoinedPlayerInfo},
+    WithMetadata,
+};
 use std::collections::BTreeMap;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tracing::{debug, info, warn};
@@ -91,35 +94,29 @@ enum WaitingRoomSeats {
 }
 
 impl WaitingRoomSeats {
-    fn player_num(&self) -> u8 {
-        match self {
-            Self::Empty => 0,
-            Self::One(_) => 1,
-            Self::Two(..) => 2,
-        }
-    }
-
-    fn room_size(&self) -> u8 {
-        2
-    }
+    const ROOM_SIZE: u8 = 2;
 
     fn is_full(&self) -> bool {
         matches!(self, Self::Two(..))
     }
 
     fn try_claim(&mut self, new_player: PlayerId) -> anyhow::Result<JoinInfo> {
-        let room = match self {
+        *self = match self {
             Self::Empty => Self::One(new_player),
             Self::One(id) => Self::Two(*id, new_player),
             Self::Two(..) => bail!("room is full"),
         };
 
-        *self = room;
-
         let ret = JoinInfo {
-            player_id: new_player,
-            join_position: self.player_num(),
-            room_size: self.room_size(),
+            joined_player: match self {
+                Self::One(id) => JoinedPlayerInfo::First(*id),
+                Self::Two(id, id2) => JoinedPlayerInfo::Second {
+                    just_joined: *id2,
+                    waiting_player: *id,
+                },
+                Self::Empty => unreachable!(),
+            },
+            room_size: Self::ROOM_SIZE,
         };
         Ok(ret)
     }

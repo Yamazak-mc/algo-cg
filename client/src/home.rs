@@ -1,6 +1,5 @@
-use crate::{AppArgs, AppState};
+use crate::{AppArgs, AppState, JoinedPlayers};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
-use bevy_dev_tools::states::log_transitions;
 use bevy_simple_text_input::{
     TextInput, TextInputInactive, TextInputPlaceholder, TextInputSettings, TextInputTextColor,
     TextInputTextFont, TextInputValue,
@@ -10,6 +9,7 @@ use client::{
         client_connection_plugin, spawn_client, CancelSpawnClientEvent, InboundEvent,
         OutboundEvent, ReceivedRequest, ReceivedResponse, SpawnClientResult,
     },
+    log_macros::*,
     utils::{
         button::{button_system, spawn_common_button, ButtonPressed},
         into_color::IntoColor,
@@ -68,13 +68,11 @@ const POPUP_BG_COLOR_RGBA: [u8; 4] = [43, 43, 43, 240];
 pub fn home_plugin(app: &mut App) {
     app.add_plugins(client_connection_plugin)
         .add_sub_state::<HomeState>()
+        .enable_state_scoped_entities::<HomeState>()
         .add_sub_state::<JoiningServerState>()
         .add_computed_state::<ConnectedToServer>()
-        .enable_state_scoped_entities::<HomeState>()
-        // .add_systems(Update, log_transitions::<HomeState>) // DEBUG
-        .add_systems(Update, log_transitions::<JoiningServerState>) // DEBUG
-        // .add_systems(Update, log_transitions::<ConnectedToServer>) // DEBUG
         .add_systems(OnEnter(AppState::Home), setup_home)
+        .add_systems(OnEnter(HomeState::JoiningServer), JoinedPlayers::setup)
         .add_systems(
             Update,
             (
@@ -112,6 +110,12 @@ pub fn home_plugin(app: &mut App) {
         .add_state_scoped_observer(
             JoiningServerState::WaitingForOtherPlayers,
             check_new_players,
+        )
+        .add_systems(
+            OnEnter(JoiningServerState::WaitingForGameToStart),
+            |mut commands: Commands| {
+                commands.set_state(AppState::Game);
+            },
         );
 }
 
@@ -285,16 +289,13 @@ fn setup_join_server(
     let addr: IpAddr = match addr_input_value.0.parse() {
         Ok(v) => v,
         Err(e) => {
-            commands.send_event(LogEvent::Push(Message::error(e.to_string())));
+            display_error!(commands, "{}", e);
             state.set(JoiningServerState::Failed);
             return;
         }
     };
 
-    commands.send_event(LogEvent::Push(Message::from_text(format!(
-        "joining the server...\nIP address: {}",
-        addr
-    ))));
+    display_info!(commands, "joining the server...\nIP address: {}", addr);
 
     spawn_client(&mut commands, addr, app_args.server_port);
     state.set(JoiningServerState::Connecting);
@@ -313,10 +314,9 @@ fn wait_for_connection(
 
     match res.0 {
         Ok(_) => {
-            // Connection is established.
-            commands.send_event(LogEvent::Push(Message::success("connected to the server")));
+            display_success!(commands, "connected to the server");
 
-            // Now send Join request to the server.
+            // Send RequestJoin to the server.
             let id = match ev_handler
                 .expect("event handler should be available at this point")
                 .send_request(OutboundEvent::RequestJoin)
@@ -324,10 +324,7 @@ fn wait_for_connection(
                 Ok(id) => id,
                 Err(e) => {
                     // Possibly disconnected from the server.
-                    commands.send_event(LogEvent::Push(Message::error(format!(
-                        "failed to send join request: {}",
-                        e
-                    ))));
+                    display_error!(commands, "failed to send join request: {}", e);
                     state.set(JoiningServerState::Failed);
                     return;
                 }
@@ -340,12 +337,7 @@ fn wait_for_connection(
             state.set(JoiningServerState::Joining);
         }
         Err(ref err_msg) => {
-            // Connection is failed.
-            commands.send_event(LogEvent::Push(Message::error(format!(
-                "failed to join the server :(\n{}",
-                err_msg
-            ))));
-
+            display_error!(commands, "failed to join the server :(\n{}", err_msg);
             state.set(JoiningServerState::Failed);
         }
     }
@@ -376,6 +368,7 @@ fn check_response_to_join(
     query: Single<(Entity, &JoinRequestEventId)>,
     mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
+    mut joined_players: ResMut<JoinedPlayers>,
 ) {
     let (entity, ev_id) = *query;
     let ev_id = ev_id.0;
@@ -393,32 +386,39 @@ fn check_response_to_join(
 
     match response {
         InboundEvent::RequestJoinAccepted(JoinInfo {
-            // TODO: Store PlayerId somewhere
-            player_id,
-            join_position,
+            joined_player,
             room_size,
         }) => {
-            commands.send_event(LogEvent::Push(Message::success(format!(
-                "joined the lobby ( {} / {} )",
-                join_position, room_size
-            ))));
-            commands.send_event(LogEvent::Push(Message::debug(format!("{:?}", player_id)))); // DEBUG
+            let player_id = joined_player.assigned_player_id();
+            let join_position = joined_player.join_position();
 
+            // Store PlayerId
+            joined_players.set_my_player(player_id);
+
+            // Log
+            display_success!(
+                commands,
+                "joined the lobby ( {} / {} )",
+                join_position,
+                room_size
+            );
+            display_debug!(commands, "{:?}", player_id);
+
+            // Set next state
             let next_state = if join_position == room_size {
+                joined_players.set_opponent_player(
+                    joined_player
+                        .waiting_player_id()
+                        .expect("there should be another player in the room"),
+                );
                 JoiningServerState::WaitingForGameToStart
             } else {
-                if join_position > room_size {
-                    warn!(
-                        "invalid join info state: join_position={}, room_size={}",
-                        join_position, room_size
-                    );
-                }
                 JoiningServerState::WaitingForOtherPlayers
             };
             state.set(next_state);
         }
         InboundEvent::Error(e) => {
-            commands.send_event(LogEvent::Push(Message::error(e)));
+            display_error!(commands, "{}", e);
             state.set(JoiningServerState::Failed);
         }
         unexp => {
@@ -432,9 +432,7 @@ fn on_click_cancel_conn_button(
     mut commands: Commands,
     mut state: ResMut<NextState<JoiningServerState>>,
 ) {
-    commands.send_event(LogEvent::Push(Message::warn(
-        "cancelling the connection...",
-    )));
+    display_warn!(commands, "cancelling the connection...");
     commands.send_event(CancelSpawnClientEvent);
     state.set(JoiningServerState::Cancelling);
 }
@@ -462,13 +460,11 @@ fn check_if_disconnected(
 ) {
     let id = trigger.event().id();
 
-    info!("event triggered! id={:?}", id);
-
     if let Some(InboundEvent::ServerShutdown) = ev_handler.storage.get_request(id) {
         // Consume this event
         ev_handler.storage.take_request(id);
 
-        commands.send_event(LogEvent::Push(Message::error("disconnected")));
+        display_error!(commands, "disconnected");
         state.set(JoiningServerState::Failed);
     }
 }
@@ -478,25 +474,33 @@ fn check_new_players(
     mut ev_handler: ResMut<client::EventHandler>,
     mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
+    mut joined_players: ResMut<JoinedPlayers>,
 ) {
     let id = trigger.event().id();
 
-    if let Some(InboundEvent::PlayerJoined(join_info)) = ev_handler.storage.get_request(id) {
-        let JoinInfo {
-            // TODO: Store PlayerId somewhere?
-            player_id,
-            join_position,
-            room_size,
-        } = *join_info;
+    if let Some(InboundEvent::PlayerJoined(JoinInfo {
+        joined_player,
+        room_size,
+    })) = ev_handler.storage.get_request(id)
+    {
+        let player_id = joined_player.assigned_player_id();
+        let join_position = joined_player.join_position();
+        let room_size = *room_size;
 
         // Consume this event
         ev_handler.storage.take_request(id);
 
-        commands.send_event(LogEvent::Push(Message::from_text(format!(
+        // Store PlayerId
+        joined_players.set_opponent_player(player_id);
+
+        // Log
+        display_info!(
+            commands,
             "new player joined the lobby ( {} / {} )",
-            join_position, room_size
-        ))));
-        commands.send_event(LogEvent::Push(Message::debug(format!("{:?}", player_id)))); // DEBUG
+            join_position,
+            room_size
+        );
+        display_debug!(commands, "{:?}", player_id); // DEBUG
 
         if join_position == room_size {
             state.set(JoiningServerState::WaitingForGameToStart);

@@ -138,7 +138,7 @@ impl PendingConnection {
                             let resp = rx.recv().await.context("server internal error")?;
                             match resp {
                                 ServerInternalEvent::RequestJoinAccepted(info) => {
-                                    let player_id = info.player_id;
+                                    let player_id = info.joined_player.assigned_player_id();
                                     stream
                                         .write_bincode(
                                             &data.response_to(OutboundEvent::RequestJoinAccepted(
