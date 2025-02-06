@@ -370,7 +370,6 @@ fn wait_for_client_to_shutdown(
     home_state.set(HomeState::Menu);
 }
 
-#[allow(clippy::never_loop)]
 fn check_response_to_join(
     response: Trigger<ReceivedResponse>,
     mut ev_handler: ResMut<client::EventHandler>,
