@@ -89,10 +89,10 @@ pub fn game_sandbox_plugin(app: &mut App) {
             },
         },
     ))
-    .add_systems(
-        Update,
-        start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),
-    )
+    // .add_systems(
+    //     Update,
+    //     start_sandbox.run_if(in_state(AppState::Home).and(input_just_pressed(KeyCode::Enter))),
+    // )
     .add_sub_state::<SandboxState>()
     .enable_state_scoped_entities::<SandboxState>()
     .add_sub_state::<MyTurnState>()

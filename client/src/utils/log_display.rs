@@ -68,6 +68,14 @@ impl LogDisplay {
         self.events.extend(message.normalized().map(LogEvent::Push));
     }
 
+    pub fn debug(&self) {
+        info!("===LogDisplay===");
+        for log in &self.logs {
+            info!("{} {}", log.header(), log.text);
+        }
+        info!("================");
+    }
+
     pub fn extend(&mut self, messages: impl IntoIterator<Item = Message>) {
         self.events.extend(
             messages
@@ -89,6 +97,7 @@ impl LogDisplay {
             match log_cmd {
                 LogEvent::Clear => self.logs.clear(),
                 LogEvent::Push(msg) => self.logs.push(msg),
+                _ => (),
             }
         }
 
@@ -127,6 +136,7 @@ impl LogDisplay {
 pub enum LogEvent {
     Clear,
     Push(Message),
+    Debug,
 }
 
 impl LogEvent {
@@ -139,6 +149,7 @@ impl LogEvent {
 pub struct Message {
     pub text: String,
     pub color: Color,
+    pub level: Option<MessageLevel>,
 }
 
 impl Message {
@@ -146,12 +157,14 @@ impl Message {
         Self {
             text: message.into(),
             color,
+            ..default()
         }
     }
 
     pub fn info(message: impl Into<String>) -> Self {
         Self {
             text: message.into(),
+            level: Some(MessageLevel::Info),
             ..default()
         }
     }
@@ -160,6 +173,7 @@ impl Message {
         Self {
             text: text.into(),
             color: Color::srgb(0.0, 1.0, 0.0),
+            level: Some(MessageLevel::Success),
         }
     }
 
@@ -167,6 +181,7 @@ impl Message {
         Self {
             text: text.into(),
             color: Color::srgb(1.0, 1.0, 0.0),
+            level: Some(MessageLevel::Warn),
         }
     }
 
@@ -174,6 +189,7 @@ impl Message {
         Self {
             text: text.into(),
             color: Color::srgb(1.0, 0.0, 0.0),
+            level: Some(MessageLevel::Error),
         }
     }
 
@@ -181,6 +197,7 @@ impl Message {
         Self {
             text: text.into(),
             color: Color::srgb_u8(0x77, 0xCD, 0xFF),
+            level: Some(MessageLevel::Debug),
         }
     }
 
@@ -190,6 +207,7 @@ impl Message {
         self.text.lines().map(move |line| Self {
             text: line.into(),
             color,
+            level: self.level,
         })
     }
 
@@ -199,6 +217,32 @@ impl Message {
             TextColor(self.color),
             ViewVisibility::default(),
         )
+    }
+
+    fn header(&self) -> String {
+        let level = self.level.map_or(default(), |v| v.as_str());
+        format!("{:>07}", level.to_uppercase())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessageLevel {
+    Debug,
+    Info,
+    Success,
+    Warn,
+    Error,
+}
+
+impl MessageLevel {
+    fn as_str(&self) -> &'static str {
+        match self {
+            MessageLevel::Debug => "DEBUG",
+            MessageLevel::Info => "INFO",
+            MessageLevel::Success => "SUCCESS",
+            MessageLevel::Warn => "WARN",
+            MessageLevel::Error => "ERROR",
+        }
     }
 }
 
@@ -224,7 +268,11 @@ fn relay_event(
                 log_display.push(Message {
                     text,
                     color: msg.color,
+                    level: msg.level,
                 });
+            }
+            LogEvent::Debug => {
+                log_display.debug();
             }
         }
     }

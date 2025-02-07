@@ -38,14 +38,14 @@ enum JoiningServerState {
     Failed,
     Joining,
     WaitingForOtherPlayers,
-    WaitingForGameToStart,
+    TransitionToGame,
 }
 
 impl JoiningServerState {
     fn connected(&self) -> bool {
         matches!(
             self,
-            Self::Joining | Self::WaitingForOtherPlayers | Self::WaitingForGameToStart
+            Self::Joining | Self::WaitingForOtherPlayers | Self::TransitionToGame
         )
     }
 }
@@ -72,6 +72,10 @@ pub fn home_plugin(app: &mut App) {
         .add_sub_state::<JoiningServerState>()
         .add_computed_state::<ConnectedToServer>()
         .add_systems(OnEnter(AppState::Home), setup_home)
+        .add_systems(
+            Update,
+            start_sandbox_conditioned.run_if(input_just_pressed(KeyCode::Enter)),
+        )
         .add_systems(OnEnter(HomeState::JoiningServer), JoinedPlayers::setup)
         .add_systems(
             Update,
@@ -112,8 +116,9 @@ pub fn home_plugin(app: &mut App) {
             check_new_players,
         )
         .add_systems(
-            OnEnter(JoiningServerState::WaitingForGameToStart),
+            OnEnter(JoiningServerState::TransitionToGame),
             |mut commands: Commands| {
+                commands.send_event(LogEvent::Debug);
                 commands.set_state(AppState::Game);
             },
         );
@@ -411,7 +416,7 @@ fn check_response_to_join(
                         .waiting_player_id()
                         .expect("there should be another player in the room"),
                 );
-                JoiningServerState::WaitingForGameToStart
+                JoiningServerState::TransitionToGame
             } else {
                 JoiningServerState::WaitingForOtherPlayers
             };
@@ -503,7 +508,24 @@ fn check_new_players(
         display_debug!(commands, "{:?}", player_id); // DEBUG
 
         if join_position == room_size {
-            state.set(JoiningServerState::WaitingForGameToStart);
+            state.set(JoiningServerState::TransitionToGame);
         }
+    }
+}
+
+fn start_sandbox_conditioned(
+    mut commands: Commands,
+    query: Single<(&TextInputValue, &TextInputInactive), With<IpAddrTextInput>>,
+) {
+    use crate::game::GameMode;
+
+    let (text, is_inactive) = *query;
+    if is_inactive.0 {
+        return;
+    }
+
+    if text.0.eq_ignore_ascii_case("sandbox") {
+        commands.set_state(AppState::Game);
+        commands.set_state(GameMode::Sandbox);
     }
 }

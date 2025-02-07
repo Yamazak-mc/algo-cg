@@ -42,7 +42,7 @@ const TALON_TRANSLATION: Vec3 = Vec3::new(2.0, CARD_DEPTH / 2.0, 0.0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, SubStates)]
 #[source(AppState = AppState::Game)]
-enum GameMode {
+pub(crate) enum GameMode {
     #[default]
     TwoPlayers,
     Sandbox,
