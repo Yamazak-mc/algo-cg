@@ -65,8 +65,6 @@ impl EventRelay {
     }
 
     fn relay_inbound_ev(&mut self) -> anyhow::Result<()> {
-        debug!("relaying inbound ev: starting");
-
         match self.stream.try_read() {
             Err(e) if e.would_block() => {
                 debug!("relaying inbound ev: exiting due to WouldBlock");
@@ -77,10 +75,9 @@ impl EventRelay {
                 Err(e.into())
             }
             Ok(ev) => {
-                debug!("read: {:?}", ev);
+                info!("read: {:?}", ev);
 
                 self.in_tx.send(ev)?;
-                debug!("relaying inbound ev: done");
                 Ok(())
             }
         }
