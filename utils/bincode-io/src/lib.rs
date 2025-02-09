@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 pub trait ReadBincodeExt {
     fn try_read_bincode<T: DeserializeOwned>(
@@ -51,6 +51,8 @@ impl<T: DeserializeOwned> BincodeReader<T> {
     }
 
     fn process_read_bytes(&mut self, n: usize) -> anyhow::Result<()> {
+        let prev_len = self.data.len();
+
         let mut i = 0;
         while i < n {
             let len = u32::from_be_bytes(self.bytes[i..i + 4].try_into().unwrap()) as usize;
@@ -63,6 +65,8 @@ impl<T: DeserializeOwned> BincodeReader<T> {
 
             i += len;
         }
+
+        info!("processed {} event(s)", self.data.len() - prev_len);
         Ok(())
     }
 }
