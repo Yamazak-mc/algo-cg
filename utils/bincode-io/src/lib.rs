@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-use tracing::info;
+use tracing::debug;
 
 pub trait ReadBincodeExt {
     fn try_read_bincode<T: DeserializeOwned>(
@@ -57,7 +57,7 @@ impl<T: DeserializeOwned> BincodeReader<T> {
 
             i += 4;
 
-            info!("deserializing bytes: range={}..{}", i, i + len);
+            debug!("deserializing bytes: range={}..{}", i, i + len);
             self.data
                 .push_back(bincode::deserialize(&self.bytes[i..i + len])?);
 
