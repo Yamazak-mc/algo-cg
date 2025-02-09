@@ -1,6 +1,6 @@
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use bevy::prelude::*;
 use protocol::{EventBox, EventKind, NextEventId, WithMetadata};
-use std::{marker::PhantomData, time::Duration};
+use std::marker::PhantomData;
 use tokio::sync::mpsc::{error::SendError, UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Resource)]
@@ -55,14 +55,12 @@ impl<I, O> EventHandler<I, O> {
 }
 
 pub struct EventHandlerPlugin<I, O> {
-    pub recv_interval: Duration,
     _marker: PhantomData<fn(&I, &O)>,
 }
 
 impl<I, O> Default for EventHandlerPlugin<I, O> {
     fn default() -> Self {
         Self {
-            recv_interval: Duration::from_secs_f32(0.05),
             _marker: PhantomData,
         }
     }
@@ -78,9 +76,7 @@ where
             .add_event::<ReceivedResponse<I>>()
             .add_systems(
                 FixedUpdate,
-                recv_inbound_events::<I, O>.run_if(
-                    resource_exists::<EventHandler<I, O>>.and(on_timer(self.recv_interval)),
-                ),
+                recv_inbound_events::<I, O>.run_if(resource_exists::<EventHandler<I, O>>),
             );
     }
 }
