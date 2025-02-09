@@ -125,6 +125,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.11",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -454,16 +455,6 @@ name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
-
-[[package]]
-name = "async-write-bincode"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "serde",
- "tokio",
-]
 
 [[package]]
 name = "atomic-waker"
@@ -1642,6 +1633,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode-io"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "serde",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1913,7 +1916,6 @@ dependencies = [
  "algo-core",
  "anyhow",
  "argh",
- "async-write-bincode",
  "bevy",
  "bevy-inspector-egui",
  "bevy_dev_tools",
@@ -1921,6 +1923,7 @@ dependencies = [
  "bevy_mod_outline",
  "bevy_simple_text_input",
  "bincode",
+ "bincode-io",
  "fontdue",
  "image",
  "itertools 0.14.0",
@@ -4710,8 +4713,8 @@ version = "0.1.0"
 dependencies = [
  "algo-core",
  "anyhow",
- "async-write-bincode",
  "bincode",
+ "bincode-io",
  "env_logger",
  "protocol",
  "thiserror 2.0.11",

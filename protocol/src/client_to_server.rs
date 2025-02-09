@@ -6,5 +6,5 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Event)]
 pub enum ClientToServerEvent {
     RequestJoin,
-    GameEventResponse(Option<GameEvent>),
+    GameEventResponse(GameEvent),
 }

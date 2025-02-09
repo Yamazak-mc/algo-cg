@@ -160,13 +160,21 @@ where
     }
 
     fn minimal_plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
-        app.add_state_scoped_observer(state.clone(), Self::insert)
-            .add_state_scoped_observer(state, Self::remove);
+        app.add_state_scoped_observer_with(
+            state.clone(),
+            Self::insert,
+            Name::new("ObsCtrlr::Insert"),
+        )
+        .add_state_scoped_observer_with(state, Self::remove, Name::new("ObsCtrlr::Remove"));
     }
 
     fn pausable_plugin_state_scoped<S: States + Clone>(app: &mut App, state: S) {
-        app.add_state_scoped_observer(state.clone(), Self::activate)
-            .add_state_scoped_observer(state, Self::pause);
+        app.add_state_scoped_observer_with(
+            state.clone(),
+            Self::activate,
+            Name::new("ObsCtrlr::Activate"),
+        )
+        .add_state_scoped_observer_with(state, Self::pause, Name::new("ObsCtrlr::Pause"));
     }
 
     fn insert(mut trigger: Trigger<Insert<E, B>>, mut commands: Commands) {

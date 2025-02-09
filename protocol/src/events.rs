@@ -1,11 +1,17 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct WithMetadata<E> {
     pub kind: EventKind,
     pub id: EventId,
     pub event: E,
+}
+
+impl<E: fmt::Debug> fmt::Debug for WithMetadata<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}({}) {:?}", self.kind, self.id, self.event)
+    }
 }
 
 impl<E> WithMetadata<E> {
@@ -33,6 +39,12 @@ pub enum EventKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[repr(transparent)]
 pub struct EventId(u32);
+
+impl fmt::Display for EventId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Ev{}", self.0)
+    }
+}
 
 impl EventId {
     pub const fn from_raw(id: u32) -> Self {
@@ -89,6 +101,20 @@ impl<E> EventBox<E> {
 
     pub fn get_response(&mut self, id: EventId) -> Option<&E> {
         self.requests.get(&id)
+    }
+
+    pub fn find_request_id(&mut self, pred: impl Fn(&E) -> bool) -> Option<EventId> {
+        self.requests.iter().find(|(_, v)| (pred)(*v)).map(|v| *v.0)
+    }
+
+    pub fn take_request_if(&mut self, pred: impl Fn(&E) -> bool) -> Option<(EventId, E)> {
+        self.find_request_id(pred)
+            .map(|id| (id, self.take_request(id).expect("request should exist")))
+    }
+
+    pub fn get_request_if(&mut self, pred: impl Fn(&E) -> bool) -> Option<(EventId, &E)> {
+        self.find_request_id(pred)
+            .map(|id| (id, self.get_request(id).expect("request should exist")))
     }
 }
 

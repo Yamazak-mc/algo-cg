@@ -4,7 +4,7 @@
 // #![warn(unused_mut, unused_must_use)]
 
 use algo_core::player::PlayerId;
-use bevy::prelude::*;
+use bevy::{log::LogPlugin, prelude::*};
 use bevy_simple_text_input::TextInputPlugin;
 use client::utils::log_display::log_display_plugin;
 
@@ -23,7 +23,7 @@ struct AppArgs {
     server_port: u16,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, States)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, States, Reflect)]
 enum AppState {
     Home,
     Game,
@@ -36,7 +36,10 @@ fn main() {
 
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(LogPlugin {
+                filter: "client=debug,wgpu=error,naga=warn".into(),
+                ..default()
+            }),
             TextInputPlugin,
             log_display_plugin,
             home::home_plugin,
@@ -49,6 +52,7 @@ fn main() {
         .init_resource::<JoinedPlayers>()
         .insert_state(AppState::Home)
         .enable_state_scoped_entities::<AppState>()
+        .register_type::<StateScoped<AppState>>()
         .add_systems(Startup, setup_camera)
         .run();
 }

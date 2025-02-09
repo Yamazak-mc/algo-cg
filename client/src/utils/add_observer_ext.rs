@@ -7,6 +7,19 @@ pub trait AddObserverExt {
         E: Event,
         B: Bundle,
         I: IntoObserverSystem<E, B, M> + Sync + Clone;
+
+    fn add_state_scoped_observer_with<S, E, B, M, I, W>(
+        &mut self,
+        state: S,
+        observer: I,
+        with: W,
+    ) -> &mut Self
+    where
+        S: States,
+        E: Event,
+        B: Bundle,
+        I: IntoObserverSystem<E, B, M> + Sync + Clone,
+        W: Bundle + Clone;
 }
 
 impl AddObserverExt for App {
@@ -19,6 +32,28 @@ impl AddObserverExt for App {
     {
         self.add_systems(OnEnter(state.clone()), move |mut commands: Commands| {
             commands.spawn((StateScoped(state.clone()), Observer::new(observer.clone())));
+        })
+    }
+
+    fn add_state_scoped_observer_with<S, E, B, M, I, W>(
+        &mut self,
+        state: S,
+        observer: I,
+        with: W,
+    ) -> &mut Self
+    where
+        S: States,
+        E: Event,
+        B: Bundle,
+        I: IntoObserverSystem<E, B, M> + Sync + Clone,
+        W: Bundle + Clone,
+    {
+        self.add_systems(OnEnter(state.clone()), move |mut commands: Commands| {
+            commands.spawn((
+                StateScoped(state.clone()),
+                Observer::new(observer.clone()),
+                with.clone(),
+            ));
         })
     }
 }

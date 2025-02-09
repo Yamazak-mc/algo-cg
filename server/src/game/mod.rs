@@ -151,6 +151,8 @@ impl GameInstance {
         game: Game,
         player_handlers: BTreeMap<PlayerId, PlayerHandler>,
     ) -> Self {
+        debug!("created GameInstance: handlers={:?}", player_handlers);
+
         Self {
             rx,
             game,
@@ -178,6 +180,7 @@ impl GameInstance {
                     bail!("server internal error: unexpected game state");
                 }
                 NextEventError::NoMoreEvent => {
+                    info!("no more event to send to the clients");
                     return Ok(GameInstanceStatus::ShouldShutdown);
                 }
             },
@@ -245,6 +248,7 @@ impl GameInstance {
             }
         }
 
+        self.game.process_event()?;
         Ok(GameInstanceStatus::KeepAlive)
     }
 

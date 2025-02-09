@@ -1,6 +1,7 @@
 use anyhow::{bail, Context as _};
 use rand::seq::SliceRandom as _;
 use std::collections::BTreeMap;
+use tracing::{debug, info};
 
 pub mod settings;
 use settings::GameSettings;
@@ -29,7 +30,7 @@ pub struct Game {
     // event management
     staged_event: Option<GameEvent>,
     event_queue: EventQueue<GameEvent>,
-    event_responses: BTreeMap<PlayerId, Option<Option<GameEvent>>>,
+    event_responses: BTreeMap<PlayerId, Option<GameEvent>>,
     history: Vec<GameEvent>,
 }
 
@@ -117,9 +118,7 @@ impl Game {
 
     /// Stores a `GameEvent` response received from a player client.
     /// If the responding player was the last one to respond,
-    /// this function performs the necessary actions,
-    /// and [`next_event`] becomes available again, in which case
-    /// the return value is `Ok(true)`.
+    /// the [`process_event`] will be available and returns `Ok(true)`
     ///
     /// Returns `Ok(false)` if there are still players have not responded yet.
     ///
@@ -127,11 +126,11 @@ impl Game {
     /// - The specified PlayerId is invalid
     /// - `process_event` returns an error
     ///
-    /// [`next_event`]: `Game::next_event`
+    /// [`process_event`]: `Game::process_event`
     pub fn store_player_response(
         &mut self,
         player: PlayerId,
-        response: Option<GameEvent>,
+        response: GameEvent,
     ) -> anyhow::Result<bool> {
         let storage = self
             .event_responses
@@ -140,13 +139,7 @@ impl Game {
 
         *storage = Some(response);
 
-        if !self.has_all_players_responded() {
-            return Ok(false);
-        }
-
-        self.process_event()?;
-
-        Ok(true)
+        Ok(self.has_all_players_responded())
     }
 
     fn turn_order(&self) -> impl Iterator<Item = PlayerId> + '_ {
@@ -166,8 +159,17 @@ impl Game {
     }
 
     pub fn process_event(&mut self) -> Result<(), ProcessEventError> {
-        if self.has_all_players_responded() {
+        if !self.has_all_players_responded() {
             return Err(ProcessEventError::NotReady);
+        }
+
+        // DEBUG
+        {
+            debug!("process event: starting");
+            debug!("responses:");
+            for (pid, resp) in self.event_responses.iter() {
+                debug!("- {:?}: {:?}", pid, resp.as_ref().unwrap());
+            }
         }
 
         // TODO: Implement event logic

@@ -1,10 +1,12 @@
 [package]
-name = "async-write-bincode"
+name = "bincode-io"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }

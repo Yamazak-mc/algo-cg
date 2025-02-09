@@ -2,7 +2,6 @@ use super::{InboundEvent, OutboundEvent};
 use crate::game::{ServerInternalEvent, WaitingRoom};
 use algo_core::player::PlayerId;
 use anyhow::{bail, Context};
-use async_write_bincode::AsyncWriteSerdeBincode as _;
 use protocol::WithMetadata;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -12,7 +11,10 @@ use tokio::{
         Semaphore,
     },
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
+
+type TcpStreamWrapper =
+    bincode_io::TcpStreamWrapper<WithMetadata<InboundEvent>, WithMetadata<OutboundEvent>>;
 
 macro_rules! unexpected_event {
     ($event:expr $(,)?) => {
@@ -83,7 +85,7 @@ impl Server {
 }
 
 struct PendingConnection {
-    stream: TcpStream,
+    stream: TcpStreamWrapper,
     socket_addr: SocketAddr,
     internal_tx: UnboundedSender<ServerInternalEvent>,
 }
@@ -95,7 +97,7 @@ impl PendingConnection {
         internal_tx: UnboundedSender<ServerInternalEvent>,
     ) -> Self {
         Self {
-            stream,
+            stream: TcpStreamWrapper::new(stream, 1024),
             socket_addr,
             internal_tx,
         }
@@ -103,28 +105,25 @@ impl PendingConnection {
 
     async fn run(mut self) -> anyhow::Result<()> {
         let stream = &mut self.stream;
-        let mut buf = vec![0; 1024];
 
         loop {
             let Ok(_) = stream.readable().await else {
                 break;
             };
 
-            match stream.try_read(&mut buf) {
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            match stream.try_read() {
+                Err(e) if e.would_block() => {
                     continue;
                 }
                 Err(e) => {
                     error!("read error: {}", e);
                     break;
                 }
-                Ok(0) => {
-                    break;
-                }
-                Ok(n) => {
-                    // Received an event
-                    let data: WithMetadata<InboundEvent> = bincode::deserialize(&buf[0..n])?;
-                    info!("{:?}", data);
+                Ok(data) => {
+                    #[cfg(debug_assertions)]
+                    {
+                        debug!("from {} {:?}", self.socket_addr, data);
+                    }
 
                     match &data.event {
                         InboundEvent::RequestJoin => {
@@ -140,7 +139,7 @@ impl PendingConnection {
                                 ServerInternalEvent::RequestJoinAccepted(info) => {
                                     let player_id = info.joined_player.assigned_player_id();
                                     stream
-                                        .write_bincode(
+                                        .write(
                                             &data.response_to(OutboundEvent::RequestJoinAccepted(
                                                 info,
                                             )),
@@ -169,7 +168,7 @@ impl PendingConnection {
 }
 
 struct Connection {
-    stream: TcpStream,
+    stream: TcpStreamWrapper,
     _socket_addr: SocketAddr,
     internal_tx: UnboundedSender<ServerInternalEvent>,
     internal_rx: UnboundedReceiver<ServerInternalEvent>,
@@ -192,37 +191,27 @@ impl Connection {
     }
 
     async fn relay_events(mut self) -> anyhow::Result<()> {
-        let mut buf = [0; 1024];
-
         loop {
             tokio::select! {
-                readable = self.stream.readable() => {
-                    readable?;
-
-                    match self.stream.try_read(&mut buf) {
-                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                Ok(_) = self.stream.readable() => {
+                    match self.stream.try_read() {
+                        Err(e) if e.would_block() => {
                             continue;
                         }
                         Err(e) => {
                             self.notify_disconnected()?;
                             return Err(e.into());
                         },
-                        Ok(0) => {
-                            self.notify_disconnected()?;
-                            bail!("peer shutdown");
-                        },
-                        Ok(n) => {
-                            let ev = bincode::deserialize(&buf[0..n])?;
+                        Ok(ev) => {
+                            debug!("from {} {:?}", self._socket_addr, ev);
                             self.internal_tx.send(ServerInternalEvent::In(self.player_id, ev))?;
                         }
                     }
                 }
-                received = self.internal_rx.recv() => {
-                    let received = received.context("server internal error")?;
-
-                    match received {
+                Some(ev) = self.internal_rx.recv() => {
+                    match ev {
                         ServerInternalEvent::Out(ev) => {
-                            self.stream.write_bincode(&ev).await?;
+                            self.stream.write(&ev).await?;
                         }
                         unexpected => unexpected_event!(unexpected),
                     }

@@ -505,7 +505,7 @@ fn check_new_players(
             join_position,
             room_size
         );
-        display_debug!(commands, "{:?}", player_id); // DEBUG
+        display_debug!(commands, "{:?}", player_id);
 
         if join_position == room_size {
             state.set(JoiningServerState::TransitionToGame);

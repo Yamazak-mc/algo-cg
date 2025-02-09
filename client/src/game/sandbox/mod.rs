@@ -161,14 +161,6 @@ pub fn game_sandbox_plugin(app: &mut App) {
     );
 }
 
-fn start_sandbox(
-    mut app_state: ResMut<NextState<AppState>>,
-    mut game_mode: ResMut<NextState<GameMode>>,
-) {
-    app_state.set(AppState::Game);
-    game_mode.set(GameMode::Sandbox);
-}
-
 #[derive(Resource)]
 struct SandboxPlayers {
     self_player: PlayerId,

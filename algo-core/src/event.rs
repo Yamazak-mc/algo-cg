@@ -50,6 +50,8 @@ pub enum GameEvent {
     },
     /// The turn is passed to the opponent.
     TurnEnded,
+    /// OK response
+    RespOk,
 }
 
 impl GameEvent {

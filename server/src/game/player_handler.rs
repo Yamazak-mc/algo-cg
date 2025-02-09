@@ -2,7 +2,7 @@ use crate::{InboundEvent, OutboundEvent};
 use algo_core::{event::GameEvent, player::PlayerId};
 use protocol::{EventKind, NextEventId, WithMetadata};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use super::ServerInternalEvent;
 
@@ -40,11 +40,15 @@ impl PlayerHandler {
     pub fn send_game_event(&mut self, event: GameEvent) -> anyhow::Result<()> {
         let id = self.next_id.produce();
 
-        self.tx.send(ServerInternalEvent::Out(WithMetadata {
+        let event = WithMetadata {
             kind: protocol::EventKind::Request,
             id,
             event: OutboundEvent::GameEvent(event),
-        }))?;
+        };
+
+        debug!("{:?}", event);
+
+        self.tx.send(ServerInternalEvent::Out(event))?;
 
         self.expected_response_id = Some(id);
 
@@ -54,7 +58,7 @@ impl PlayerHandler {
     pub fn check_for_game_event_response(
         &mut self,
         received: WithMetadata<InboundEvent>,
-    ) -> Option<Option<GameEvent>> {
+    ) -> Option<GameEvent> {
         let WithMetadata { kind, id, event } = received;
 
         if kind == EventKind::Request {

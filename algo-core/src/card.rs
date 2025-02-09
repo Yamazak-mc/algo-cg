@@ -2,7 +2,7 @@ use anyhow::{bail, Context as _};
 use itertools::Itertools as _;
 use rand::seq::SliceRandom as _;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 /// Possible card colors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
@@ -25,6 +25,13 @@ impl CardColor {
         match self {
             Self::Black => [u8::MAX; 3],
             Self::White => [0; 3],
+        }
+    }
+
+    fn symbol(&self) -> u8 {
+        match self {
+            CardColor::Black => b'B',
+            CardColor::White => b'W',
         }
     }
 }
@@ -284,12 +291,22 @@ impl Talon {
 
     pub fn view(&self) -> TalonView {
         TalonView {
-            cards: self.cards.iter().map(|v| v.public_view()).collect(),
+            cards: self.cards.iter().map(|v| v.pub_info.color).collect(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TalonView {
-    pub cards: Vec<CardView>,
+    pub cards: Vec<CardColor>,
+}
+
+impl fmt::Debug for TalonView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let cards = self.cards.iter().map(|v| v.symbol()).collect::<Vec<_>>();
+        f.debug_tuple("TalonView")
+            .field(&unsafe { String::from_utf8_unchecked(cards) })
+            .finish()
+        // SAFETY: CardColor::symbol returns only valid UTF-8.
+    }
 }

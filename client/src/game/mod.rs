@@ -19,7 +19,6 @@ use dialog::dialog_plugin;
 mod p2;
 use p2::p2_plugin;
 
-// DEBUG
 mod sandbox;
 use sandbox::game_sandbox_plugin;
 
@@ -65,7 +64,7 @@ pub fn game_plugin(app: &mut App) {
             card_field_plugin,
             dialog_plugin,
             p2_plugin,
-            game_sandbox_plugin, // DEBUG
+            game_sandbox_plugin,
         ))
         .add_systems(OnEnter(CTX_STATE), setup_game);
 }

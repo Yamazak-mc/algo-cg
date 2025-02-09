@@ -1,7 +1,6 @@
-use std::{marker::PhantomData, time::Duration};
-
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use protocol::{EventBox, EventKind, NextEventId, WithMetadata};
+use std::{marker::PhantomData, time::Duration};
 use tokio::sync::mpsc::{error::SendError, UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Resource)]
@@ -29,6 +28,7 @@ impl<I, O> EventHandler<I, O> {
         &mut self,
         event: O,
     ) -> Result<protocol::EventId, SendError<WithMetadata<O>>> {
+        debug!("send_request");
         let id = self.next_id.produce();
         self.out_tx
             .send(WithMetadata {
@@ -44,6 +44,8 @@ impl<I, O> EventHandler<I, O> {
         id: protocol::EventId,
         event: O,
     ) -> Result<(), SendError<WithMetadata<O>>> {
+        debug!("send_response");
+        // TODO: Validate EventId
         self.out_tx.send(WithMetadata {
             kind: EventKind::Response,
             id,
@@ -120,8 +122,10 @@ fn recv_inbound_events<I, O>(
     let Ok(event) = ev_handler.in_rx.try_recv() else {
         return;
     };
+    debug!("handler received: {:?}", event);
 
     let (kind, id) = event.metadata();
+
     if let Some(ev) = ev_handler.storage.store(event) {
         warn!("EventId collision occured: {:?}, {:?}, {:?}", kind, id, ev);
     }

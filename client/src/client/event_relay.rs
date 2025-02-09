@@ -1,17 +1,23 @@
 use super::{InboundEvent, OutboundEvent};
-use anyhow::bail;
-use async_write_bincode::AsyncWriteSerdeBincode as _;
-use bevy::prelude::info;
+use bevy::prelude::{debug, info};
 use protocol::WithMetadata;
-use tokio::{io::AsyncReadExt, net::TcpStream, sync::mpsc};
+use tokio::{net::TcpStream, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 
+type TcpStreamWrapper =
+    bincode_io::TcpStreamWrapper<WithMetadata<InboundEvent>, WithMetadata<OutboundEvent>>;
+
 pub struct EventRelay {
-    stream: TcpStream,
+    stream: TcpStreamWrapper,
     out_rx: mpsc::UnboundedReceiver<WithMetadata<OutboundEvent>>,
     in_tx: mpsc::UnboundedSender<WithMetadata<InboundEvent>>,
-    buf: [u8; 1024],
     shutdown_token: CancellationToken,
+}
+
+impl Drop for EventRelay {
+    fn drop(&mut self) {
+        info!("dropping EventRelay");
+    }
 }
 
 const INTERNAL_DISCONNECTED_EV: WithMetadata<InboundEvent> = WithMetadata {
@@ -28,51 +34,53 @@ impl EventRelay {
         shutdown_token: CancellationToken,
     ) -> Self {
         Self {
-            stream,
+            stream: TcpStreamWrapper::new(stream, 1024),
             out_rx,
             in_tx,
-            buf: [0; 1024],
             shutdown_token,
         }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
+            debug!("entering select");
             tokio::select! {
                 _ = self.shutdown_token.cancelled() => {
                     info!("received a shutdown token");
                     break;
-                },
-
-                outbound_ev = self.out_rx.recv() => {
-                    let Some(outbound_ev) = outbound_ev else {
-                        // Inbound event sender is dropped.
-                        break;
-                    };
-                    self.stream.write_bincode(&outbound_ev).await?;
                 }
 
-                readable = self.stream.readable() => {
-                    readable?;
+                Ok(_) = self.stream.readable() => {
+                    self.relay_inbound_ev()?;
+                }
 
-                    self.relay_inbound_ev().await?;
+                Some(outbound_ev) = self.out_rx.recv() => {
+                    self.stream.write(&outbound_ev).await?;
                 }
             }
         }
 
+        info!("finish relaying events");
         Ok(())
     }
 
-    async fn relay_inbound_ev(&mut self) -> anyhow::Result<()> {
-        match self.stream.read(&mut self.buf).await {
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(()),
-            Err(_) | Ok(0) => {
-                self.in_tx.send(INTERNAL_DISCONNECTED_EV)?;
-                bail!("disconnected from the server");
+    fn relay_inbound_ev(&mut self) -> anyhow::Result<()> {
+        debug!("relaying inbound ev: starting");
+
+        match self.stream.try_read() {
+            Err(e) if e.would_block() => {
+                debug!("relaying inbound ev: exiting due to WouldBlock");
+                Ok(())
             }
-            Ok(n) => {
-                let inbound_ev = bincode::deserialize(&self.buf[0..n])?;
-                self.in_tx.send(inbound_ev)?;
+            Err(e) => {
+                self.in_tx.send(INTERNAL_DISCONNECTED_EV)?;
+                Err(e.into())
+            }
+            Ok(ev) => {
+                debug!("read: {:?}", ev);
+
+                self.in_tx.send(ev)?;
+                debug!("relaying inbound ev: done");
                 Ok(())
             }
         }

@@ -42,7 +42,10 @@ pub fn client_connection_plugin(app: &mut App) {
 /// [`client_connection_plugin`] is required.
 pub fn spawn_client(commands: &mut Commands, addr: IpAddr, port: u16) {
     let conn_handle = connect(addr, port);
-    commands.spawn(ConnectionHandle(Some(conn_handle)));
+    commands.spawn((
+        ConnectionHandle(Some(conn_handle)),
+        Name::new("ConnectionHandle"),
+    ));
 }
 
 #[derive(Debug, Event)]
@@ -113,6 +116,8 @@ fn connect(addr: IpAddr, port: u16) -> ConnectionHandleImpl {
                     return Err(e.into());
                 }
             };
+
+            info!("created socket: {}", stream.local_addr().unwrap()); // DEBUG
             let mut event_relay = EventRelay::new(stream, out_rx, in_tx, shutdown_token_cloned);
 
             tokio::select! {
