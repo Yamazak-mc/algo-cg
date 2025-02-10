@@ -38,7 +38,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(LogPlugin {
-                filter: "protocol=debug,client=debug,wgpu=error,naga=warn".into(),
+                filter: "protocol=info,client=debug,wgpu=error,naga=warn".into(),
                 ..default()
             }),
             TextInputPlugin,

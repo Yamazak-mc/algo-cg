@@ -93,6 +93,7 @@ fn setup_game(mut commands: Commands) {
             settings: InfiniteGridSettings { ..default() },
             ..default()
         },
+        Name::new("InfiniteGrid"),
     ));
 
     // lights
