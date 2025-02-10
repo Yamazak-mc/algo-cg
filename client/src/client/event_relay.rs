@@ -1,4 +1,4 @@
-use super::{InboundEvent, OutboundEvent};
+use super::{InboundEvent, OutboundEvent, DISCONNECTED_EV_ID};
 use bevy::prelude::{debug, info};
 use protocol::WithMetadata;
 use tokio::{net::TcpStream, sync::mpsc};
@@ -22,7 +22,7 @@ impl Drop for EventRelay {
 
 const INTERNAL_DISCONNECTED_EV: WithMetadata<InboundEvent> = WithMetadata {
     kind: protocol::EventKind::Request,
-    id: protocol::EventId::from_raw(0),
+    id: DISCONNECTED_EV_ID,
     event: InboundEvent::ServerShutdown,
 };
 

@@ -7,3 +7,4 @@ edition = "2021"
 algo-core = { path = "../algo-core" }
 bevy_ecs = "0.15.1"
 serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }

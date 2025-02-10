@@ -19,8 +19,8 @@ impl Plugin for SandboxAttackerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.settings)
             .add_systems(OnEnter(SANDBOX_CTX_STATE), setup_attacker_fields)
-            .add_state_scoped_observer(SANDBOX_CTX_STATE, AddAttacker::handle_trigger)
-            .add_state_scoped_observer(SANDBOX_CTX_STATE, AttackTo::handle_trigger);
+            .add_state_scoped_observer_named(SANDBOX_CTX_STATE, AddAttacker::handle_trigger)
+            .add_state_scoped_observer_named(SANDBOX_CTX_STATE, AttackTo::handle_trigger);
     }
 }
 

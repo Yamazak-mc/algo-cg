@@ -22,6 +22,8 @@ pub type EventHandler = event_handler::EventHandler<InboundEvent, OutboundEvent>
 pub type ReceivedRequest = event_handler::ReceivedRequest<InboundEvent>;
 pub type ReceivedResponse = event_handler::ReceivedResponse<InboundEvent>;
 
+pub const DISCONNECTED_EV_ID: protocol::EventId = protocol::EventId::from_raw(0);
+
 pub fn client_connection_plugin(app: &mut App) {
     app.add_plugins(event_handler::EventHandlerPlugin::<
         InboundEvent,

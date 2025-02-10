@@ -5,8 +5,8 @@ use client::utils::AddObserverExt as _;
 
 pub fn card_picking_plugin(app: &mut App) {
     app.add_plugins((MeshPickingPlugin, OutlinePlugin))
-        .add_state_scoped_observer(CTX_STATE, PickableCard::init)
-        .add_state_scoped_observer(CTX_STATE, PickableCard::cleanup);
+        .add_state_scoped_observer_named(CTX_STATE, PickableCard::init)
+        .add_state_scoped_observer_named(CTX_STATE, PickableCard::cleanup);
 }
 
 #[derive(Component)]

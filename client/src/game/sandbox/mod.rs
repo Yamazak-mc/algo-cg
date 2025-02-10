@@ -104,8 +104,8 @@ pub fn game_sandbox_plugin(app: &mut App) {
         OnEnter(GameMode::Sandbox),
         (init_sandbox_resources, setup_sandbox).chain(),
     )
-    .add_state_scoped_observer(GameMode::Sandbox, InsertCardToField::handle_trigger)
-    .add_state_scoped_observer(
+    .add_state_scoped_observer_named(GameMode::Sandbox, InsertCardToField::handle_trigger)
+    .add_state_scoped_observer_named(
         SandboxState::DistributeCards,
         DistributeCard::handle_trigger,
     )

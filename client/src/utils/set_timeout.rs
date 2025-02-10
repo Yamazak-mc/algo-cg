@@ -8,8 +8,11 @@ pub struct SetTimeoutPlugin<S> {
 impl<S: States + Clone> Plugin for SetTimeoutPlugin<S> {
     fn build(&self, app: &mut App) {
         app.init_resource::<EventsOnTimedout>()
-            .add_state_scoped_observer(self.ctx_state.clone(), SetTimeout::handle_trigger)
-            .add_state_scoped_observer(self.ctx_state.clone(), NotifyTimedout::handle_trigger);
+            .add_state_scoped_observer_named(self.ctx_state.clone(), SetTimeout::handle_trigger)
+            .add_state_scoped_observer_named(
+                self.ctx_state.clone(),
+                NotifyTimedout::handle_trigger,
+            );
     }
 }
 

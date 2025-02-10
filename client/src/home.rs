@@ -89,16 +89,19 @@ pub fn home_plugin(app: &mut App) {
             )
                 .run_if(in_state(HomeState::Menu)),
         )
-        .add_state_scoped_observer(HomeState::Menu, on_click_join_server_button)
-        .add_state_scoped_observer(HomeState::Menu, on_click_quit_button)
+        .add_state_scoped_observer_named(HomeState::Menu, on_click_join_server_button)
+        .add_state_scoped_observer_named(HomeState::Menu, on_click_quit_button)
         .add_systems(OnEnter(HomeState::JoiningServer), setup_join_server_ui)
         .add_systems(OnEnter(JoiningServerState::Setup), setup_join_server)
         .add_systems(
             Update,
             button_system::<PopupCenterButton>.run_if(in_state(HomeState::JoiningServer)),
         )
-        .add_state_scoped_observer(JoiningServerState::Connecting, on_click_cancel_conn_button)
-        .add_state_scoped_observer(
+        .add_state_scoped_observer_named(
+            JoiningServerState::Connecting,
+            on_click_cancel_conn_button,
+        )
+        .add_state_scoped_observer_named(
             JoiningServerState::Failed,
             on_click_acknowledge_conn_failure,
         )
@@ -111,9 +114,9 @@ pub fn home_plugin(app: &mut App) {
             wait_for_client_to_shutdown.run_if(in_state(JoiningServerState::Cancelling)),
         )
         .add_systems(OnEnter(JoiningServerState::Failed), modify_button_text)
-        .add_state_scoped_observer(JoiningServerState::Joining, check_response_to_join)
-        .add_state_scoped_observer(ConnectedToServer, check_if_disconnected)
-        .add_state_scoped_observer(
+        .add_state_scoped_observer_named(JoiningServerState::Joining, check_response_to_join)
+        .add_state_scoped_observer_named(ConnectedToServer, check_if_disconnected)
+        .add_state_scoped_observer_named(
             JoiningServerState::WaitingForOtherPlayers,
             check_new_players,
         )
@@ -339,6 +342,7 @@ fn wait_for_connection(
             commands.spawn((
                 StateScoped(JoiningServerState::Joining),
                 JoinRequestEventId(id),
+                Name::new("JoinRequestEventIdStorage"),
             ));
 
             state.set(JoiningServerState::Joining);
@@ -372,19 +376,16 @@ fn wait_for_client_to_shutdown(
 fn check_response_to_join(
     response: Trigger<ReceivedResponse>,
     mut ev_handler: ResMut<client::EventHandler>,
-    query: Single<(Entity, &JoinRequestEventId)>,
+    join_request_ev_id: Single<&JoinRequestEventId>,
     mut state: ResMut<NextState<JoiningServerState>>,
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
 ) {
-    let (entity, ev_id) = *query;
-    let ev_id = ev_id.0;
+    let ev_id = join_request_ev_id.0;
 
     if response.event().id() != ev_id {
         return;
     }
-
-    commands.entity(entity).despawn();
 
     let response = ev_handler
         .storage
@@ -468,8 +469,7 @@ fn check_if_disconnected(
     let id = trigger.event().id();
 
     if let Some(InboundEvent::ServerShutdown) = ev_handler.storage.get_request(id) {
-        // Consume this event
-        ev_handler.storage.take_request(id);
+        // Do not consume this event so that other systems can also read it.
 
         display_error!(commands, "disconnected");
         state.set(JoiningServerState::Failed);

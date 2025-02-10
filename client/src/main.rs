@@ -6,7 +6,7 @@
 use algo_core::player::PlayerId;
 use bevy::{log::LogPlugin, prelude::*};
 use bevy_simple_text_input::TextInputPlugin;
-use client::utils::log_display::log_display_plugin;
+use client::utils::{add_observer_ext::AddObserverExtPlugin, log_display::log_display_plugin};
 
 mod game;
 mod home;
@@ -37,16 +37,17 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(LogPlugin {
-                filter: "client=debug,wgpu=error,naga=warn".into(),
+                filter: "protocol=debug,client=debug,wgpu=error,naga=warn".into(),
                 ..default()
             }),
             TextInputPlugin,
             log_display_plugin,
+            AddObserverExtPlugin,
             home::home_plugin,
             game::game_plugin,
             // DEBUG
             bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            // bevy_remote_inspector::RemoteInspectorPlugins
+            // bevy_remote_inspector::RemoteInspectorPlugins,
         ))
         .insert_resource(args)
         .init_resource::<JoinedPlayers>()

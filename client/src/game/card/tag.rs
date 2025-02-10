@@ -12,8 +12,8 @@ const TAG_3D_OFFSET: Vec3 = Vec3::new(0.0, 0.0, CARD_HEIGHT / 2.0);
 const TAG_2D_OFFSET: Vec3 = Vec3::new(0.0, -FONT_SIZE * 0.75, 0.0);
 
 pub fn card_tag_plugin(app: &mut App) {
-    app.add_state_scoped_observer(CTX_STATE, SpawnCardTag::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, DespawnCardTag::handle_trigger);
+    app.add_state_scoped_observer_named(CTX_STATE, SpawnCardTag::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, DespawnCardTag::handle_trigger);
 }
 
 #[derive(Event)]

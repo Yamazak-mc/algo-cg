@@ -13,7 +13,7 @@ const GAP: Vec2 = Vec2::new(4.0, 4.0);
 pub fn card_guessing_plugin(app: &mut App) {
     app.add_sub_state::<NumSelectorState>()
         .enable_state_scoped_entities::<NumSelectorState>()
-        .add_state_scoped_observer(CTX_STATE, SpawnNumSelector::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, SpawnNumSelector::handle_trigger)
         .add_systems(
             OnEnter(NumSelectorState::Selecting),
             SpawnNumSelector::setup_button_interaction,

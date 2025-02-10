@@ -8,8 +8,8 @@ use super::CARD_WIDTH_PLUS_GAP;
 const CARD_INSERTION_ANIMATION_SECS: f32 = 0.5;
 
 pub fn card_field_plugin(app: &mut App) {
-    app.add_state_scoped_observer(AppState::Game, CardPosition::init)
-        .add_state_scoped_observer(AppState::Game, CardPosition::shift);
+    app.add_state_scoped_observer_named(AppState::Game, CardPosition::init)
+        .add_state_scoped_observer_named(AppState::Game, CardPosition::shift);
 }
 
 #[derive(Debug, Default, Component)]

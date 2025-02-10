@@ -19,9 +19,9 @@ impl<T> AnimateOncePlugin<T> {
 impl<T: States + Clone> Plugin for AnimateOncePlugin<T> {
     fn build(&self, app: &mut App) {
         if let Some(ref state) = self.target_state {
-            app.add_state_scoped_observer(state.clone(), AnimateOnce::handle_trigger)
-                .add_state_scoped_observer(state.clone(), AnimateOnce::cleanup)
-                .add_state_scoped_observer(state.clone(), AnimateTransform::handle_trigger);
+            app.add_state_scoped_observer_named(state.clone(), AnimateOnce::handle_trigger)
+                .add_state_scoped_observer_named(state.clone(), AnimateOnce::cleanup)
+                .add_state_scoped_observer_named(state.clone(), AnimateTransform::handle_trigger);
         } else {
             app.add_observer(AnimateOnce::handle_trigger)
                 .add_observer(AnimateOnce::cleanup)

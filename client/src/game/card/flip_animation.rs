@@ -10,9 +10,9 @@ const FLIP_ANIMATION_DURATION_SECS: f32 = 0.5;
 
 pub fn card_flip_plugin(app: &mut App) {
     app.add_systems(Startup, setup_animation)
-        .add_state_scoped_observer(CTX_STATE, FlipCard::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, CardFlipStarted::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, CardFlipFinished::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, FlipCard::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, CardFlipStarted::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, CardFlipFinished::handle_trigger)
         .add_systems(Update, CardFlipTarget::adjust_y.run_if(in_state(CTX_STATE)));
 }
 

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
+use tracing::debug;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct WithMetadata<E> {
@@ -47,6 +48,8 @@ impl fmt::Display for EventId {
 }
 
 impl EventId {
+    pub const PLACEHOLDER: Self = Self(u32::MAX);
+
     pub const fn from_raw(id: u32) -> Self {
         Self(id)
     }
@@ -87,12 +90,24 @@ impl<E> EventBox<E> {
         .insert(event.id, event.event)
     }
 
+    #[track_caller]
     pub fn take_request(&mut self, id: EventId) -> Option<E> {
-        self.requests.remove(&id)
+        debug!(
+            "take_request({:?}) caller={}",
+            id,
+            std::panic::Location::caller(),
+        );
+        self.requests.remove(&id).inspect(event_found)
     }
 
+    #[track_caller]
     pub fn take_response(&mut self, id: EventId) -> Option<E> {
-        self.responses.remove(&id)
+        debug!(
+            "take_response({:?}) caller={}",
+            id,
+            std::panic::Location::caller(),
+        );
+        self.responses.remove(&id).inspect(event_found)
     }
 
     pub fn get_request(&mut self, id: EventId) -> Option<&E> {
@@ -133,4 +148,8 @@ impl NextEventId {
         self.0 .0 += 1;
         self.0
     }
+}
+
+fn event_found<T>(_: &T) {
+    debug!("- event found")
 }

@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use client::utils::{set_timeout::SetTimeout, AddObserverExt};
 
 pub fn dialog_plugin(app: &mut App) {
-    app.add_state_scoped_observer(CTX_STATE, Dialog::on_insert)
-        .add_state_scoped_observer(CTX_STATE, Dialog::on_remove);
+    app.add_state_scoped_observer_named(CTX_STATE, Dialog::on_insert)
+        .add_state_scoped_observer_named(CTX_STATE, Dialog::on_remove);
 }
 
 pub struct DialogButton {

@@ -12,11 +12,11 @@ use std::f32::consts::PI;
 
 pub fn card_instance_plugin(app: &mut App) {
     app.add_systems(Update, CardInstance::on_change.run_if(in_state(CTX_STATE)))
-        .add_state_scoped_observer(CTX_STATE, CardInstance::init)
-        .add_state_scoped_observer(CTX_STATE, AddPrivInfo::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, Reveal::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, RevealWith::handle_trigger)
-        .add_state_scoped_observer(CTX_STATE, UpdateMaterial::handle_trigger);
+        .add_state_scoped_observer_named(CTX_STATE, CardInstance::init)
+        .add_state_scoped_observer_named(CTX_STATE, AddPrivInfo::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, Reveal::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, RevealWith::handle_trigger)
+        .add_state_scoped_observer_named(CTX_STATE, UpdateMaterial::handle_trigger);
 }
 
 /// The main card component.

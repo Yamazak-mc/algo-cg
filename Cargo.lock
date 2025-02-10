@@ -4232,6 +4232,7 @@ dependencies = [
  "algo-core",
  "bevy_ecs",
  "serde",
+ "tracing",
 ]
 
 [[package]]
