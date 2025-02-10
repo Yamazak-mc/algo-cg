@@ -13,7 +13,7 @@ pub enum GameEvent {
     /// The game is started.
     GameStarted(TalonView),
     /// The turn order is determined.
-    TurnOrderDetermined(Box<[PlayerId]>),
+    TurnOrderDetermined(Vec<PlayerId>),
     /// The card is given out to the player.
     DrawnCard(PlayerId),
     /// The turn is given to the player.
