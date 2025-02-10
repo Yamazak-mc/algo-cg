@@ -70,7 +70,9 @@ pub fn home_plugin(app: &mut App) {
         .add_sub_state::<HomeState>()
         .enable_state_scoped_entities::<HomeState>()
         .add_sub_state::<JoiningServerState>()
+        .enable_state_scoped_entities::<JoiningServerState>()
         .add_computed_state::<ConnectedToServer>()
+        .enable_state_scoped_entities::<ConnectedToServer>()
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(
             Update,
