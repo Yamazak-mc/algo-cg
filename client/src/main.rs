@@ -10,6 +10,7 @@ use client::utils::{add_observer_ext::AddObserverExtPlugin, log_display::log_dis
 
 mod game;
 mod home;
+mod inspector;
 
 /// Arguments for launching client app.
 #[derive(argh::FromArgs, Debug, Resource)]
@@ -46,8 +47,7 @@ fn main() {
             home::home_plugin,
             game::game_plugin,
             // DEBUG
-            bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            // bevy_remote_inspector::RemoteInspectorPlugins,
+            inspector::inspector_plugin,
         ))
         .insert_resource(args)
         .init_resource::<JoinedPlayers>()
