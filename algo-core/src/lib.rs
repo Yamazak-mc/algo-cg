@@ -1,7 +1,9 @@
 use anyhow::{bail, Context as _};
 use rand::seq::SliceRandom as _;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 use tracing::{debug, info};
+
+// TODO: fix visibility
 
 pub mod settings;
 use settings::GameSettings;
@@ -13,7 +15,9 @@ pub mod player;
 use player::{Player, PlayerId, PlayerView, TurnPlayer};
 
 pub mod event;
-use event::{EventQueue, GameEvent};
+use event::{BoardChange, CardLocation, CardMovement, EventQueue, GameEvent, GameEventKind};
+
+type ProcessEventResult = Result<(), ProcessEventError>;
 
 /// A structure controlling the game sequences.
 #[derive(Debug, Clone)]
@@ -158,7 +162,7 @@ impl Game {
         self.staged_event = Some(event);
     }
 
-    pub fn process_event(&mut self) -> Result<(), ProcessEventError> {
+    pub fn process_event(&mut self) -> ProcessEventResult {
         if !self.has_all_players_responded() {
             return Err(ProcessEventError::NotReady);
         }
@@ -172,25 +176,249 @@ impl Game {
             }
         }
 
-        // TODO: Implement event logic
+        // Main logic
+        let event = self.staged_event.take().unwrap();
+        match event {
+            GameEvent::BoardChanged(_) => (),
+            GameEvent::GameStarted(_) => {
+                self.start_game();
+            }
+            GameEvent::TurnOrderDetermined(_) => (),
+            GameEvent::CardDistributed(pid) => {
+                let change = self.board.draw_direct(pid);
+                self.event_queue.push_sub(GameEvent::BoardChanged(change));
+            }
+            GameEvent::TurnStarted(_) => {
+                self.turn.start_turn();
+                self.event_queue.push_main(GameEvent::TurnPlayerDrewCard);
+            }
+            GameEvent::TurnPlayerDrewCard => {
+                self.resolve_turn_player_draw();
+            }
+            GameEvent::NoCardsLeft => {
+                self.event_queue.push_main(GameEvent::GameEnded);
+            }
+            GameEvent::AttackTargetSelectionRequired { .. } => {
+                self.resolve_resp_attack_target_selection()?;
+            }
+            GameEvent::AttackTargetSelected { .. } => {
+                self.event_queue.push_main(GameEvent::NumberGuessRequired);
+            }
+            GameEvent::NumberGuessRequired => {
+                self.resolve_resp_number_guess()?;
+            }
+            GameEvent::NumberGuessed(_) => {
+                self.resolve_attack();
+            }
+            GameEvent::AttackSucceeded => {
+                self.resolve_succeeded_attack();
+            }
+            GameEvent::AttackFailed => {
+                self.resolve_failed_attack();
+            }
+            GameEvent::AttackedPlayerLost => {
+                // Currently, there are only 2 players
+                // If one loses, the game should end immediately.
+                self.event_queue.push_main(GameEvent::GameEnded);
+            }
+            GameEvent::GameEnded => (),
+            GameEvent::AttackOrStayDecisionRequired => {
+                self.resolve_resp_attack_or_stay_decision()?;
+            }
+            GameEvent::AttackOrStayDecided { attack } => {
+                if attack {
+                    self.event_queue
+                        .push_main(GameEvent::AttackTargetSelectionRequired {
+                            target_player: self.turn.attack_target_player(),
+                        });
+                } else {
+                    self.resolve_stay();
+                }
+            }
+            GameEvent::TurnEnded => {
+                self.turn.end_turn();
 
-        // Cleanup
-        self.finish_event();
+                self.event_queue
+                    .push_main(GameEvent::TurnStarted(self.turn.turn_player()));
+            }
+            GameEvent::RespOk => unreachable!(),
+        }
+
+        // Responses left in the storage are expected to be `RespOk`.
+        for (pid, resp) in self.event_responses.iter_mut() {
+            match resp.take() {
+                Some(GameEvent::RespOk) => {
+                    continue;
+                }
+                Some(unexpected) => {
+                    return Err(ResponseError {
+                        kind: ResponseErrorKind::InvalidGameEventKind {
+                            expected: GameEventKind::RespOk,
+                        },
+                        player: *pid,
+                        response: unexpected,
+                    }
+                    .into());
+                }
+                None => unreachable!(),
+            }
+        }
+
+        // Update history
+        self.history.push(event);
 
         Ok(())
     }
 
-    fn finish_event(&mut self) {
-        self.history.push(
-            self.staged_event
-                .take()
-                .expect("there should be a staged event"),
-        );
+    fn take_turn_player_resp(&mut self) -> GameEvent {
+        self.event_responses
+            .get_mut(&self.turn.turn_player())
+            .unwrap()
+            .take()
+            .unwrap()
+    }
 
-        // Cleanup responses
-        for val in self.event_responses.values_mut() {
-            val.take();
+    fn start_game(&mut self) {
+        let turn_order = self.turn_order().collect::<Vec<_>>();
+
+        self.event_queue
+            .push_main(GameEvent::TurnOrderDetermined(turn_order.clone()));
+
+        for _ in 0..4 {
+            for pid in &turn_order {
+                self.event_queue.push_main(GameEvent::CardDistributed(*pid));
+            }
         }
+        self.event_queue
+            .push_main(GameEvent::TurnStarted(self.turn.turn_player()));
+    }
+
+    fn resolve_turn_player_draw(&mut self) {
+        let draw_res = self.board.draw(self.turn.turn_player());
+
+        match draw_res {
+            Some(change) => {
+                self.event_queue.push_sub(GameEvent::BoardChanged(change));
+
+                self.event_queue
+                    .push_main(GameEvent::AttackTargetSelectionRequired {
+                        target_player: self.turn.attack_target_player(),
+                    });
+            }
+            None => self.event_queue.push_main(GameEvent::NoCardsLeft),
+        }
+    }
+
+    fn resolve_resp_attack_target_selection(&mut self) -> ProcessEventResult {
+        let resp = self.take_turn_player_resp();
+        let GameEvent::AttackTargetSelected { target_idx } = resp else {
+            return Err(self.invalid_resp_kind(GameEventKind::AttackTargetSelected, resp));
+        };
+
+        if !self
+            .board
+            .verify_attack_target(self.turn.attack_target_player(), target_idx)
+        {
+            return Err(self.resp_err(ResponseErrorKind::InvalidAttackTarget, resp));
+        }
+
+        self.turn.attack.target_card_idx = Some(target_idx);
+        self.event_queue.push_main(resp);
+
+        Ok(())
+    }
+
+    fn resolve_resp_number_guess(&mut self) -> ProcessEventResult {
+        let resp = self.take_turn_player_resp();
+        let GameEvent::NumberGuessed(num) = resp else {
+            return Err(self.invalid_resp_kind(GameEventKind::NumberGuessed, resp));
+        };
+
+        if !(0..=11).contains(&num.0) {
+            return Err(self.resp_err(ResponseErrorKind::NumberOutOfRange, resp));
+        }
+
+        self.turn.attack.guess = Some(num);
+        self.event_queue.push_main(resp);
+
+        Ok(())
+    }
+
+    fn resolve_attack(&mut self) {
+        let attacked = self.turn.attack_target_player();
+        let target_idx = self.turn.attack.target_card_idx.unwrap();
+        let guess = self.turn.attack.guess.unwrap();
+
+        let res = self.board.resolve_attack(attacked, target_idx, guess);
+
+        self.event_queue.push_main(if res {
+            GameEvent::AttackSucceeded
+        } else {
+            GameEvent::AttackFailed
+        });
+    }
+
+    fn resolve_succeeded_attack(&mut self) {
+        let attacked = self.turn.attack_target_player();
+        let target_idx = self.turn.attack.target_card_idx.unwrap();
+
+        let change = self.board.resolve_succeeded_attack(attacked, target_idx);
+        self.event_queue.push_sub(GameEvent::BoardChanged(change));
+
+        let res = self.board.has_player_lost_game(attacked);
+        self.event_queue.push_main(if res {
+            GameEvent::AttackedPlayerLost
+        } else {
+            GameEvent::AttackOrStayDecisionRequired
+        });
+
+        // Cleanup
+        self.turn.attack.target_card_idx.take();
+        self.turn.attack.guess.take();
+    }
+
+    fn resolve_failed_attack(&mut self) {
+        let attacker = self.turn.turn_player();
+
+        for change in self.board.resolve_failed_attack(attacker) {
+            self.event_queue.push_sub(GameEvent::BoardChanged(change));
+        }
+
+        self.event_queue.push_main(GameEvent::TurnEnded);
+    }
+
+    fn resolve_resp_attack_or_stay_decision(&mut self) -> ProcessEventResult {
+        let resp = self.take_turn_player_resp();
+        let GameEvent::AttackOrStayDecided { .. } = resp else {
+            return Err(self.invalid_resp_kind(GameEventKind::AttackOrStayDecided, resp));
+        };
+
+        self.event_queue.push_main(resp);
+
+        Ok(())
+    }
+
+    fn resolve_stay(&mut self) {
+        let change = self.board.resolve_stay(self.turn.turn_player());
+
+        self.event_queue.push_sub(GameEvent::BoardChanged(change));
+        self.event_queue.push_main(GameEvent::TurnEnded);
+    }
+
+    fn resp_err(&self, kind: ResponseErrorKind, resp: GameEvent) -> ProcessEventError {
+        ResponseError {
+            kind,
+            player: self.turn.turn_player(),
+            response: resp,
+        }
+        .into()
+    }
+
+    fn invalid_resp_kind(&self, kind: GameEventKind, resp: GameEvent) -> ProcessEventError {
+        self.resp_err(
+            ResponseErrorKind::InvalidGameEventKind { expected: kind },
+            resp,
+        )
     }
 }
 
@@ -208,6 +436,30 @@ pub enum ProcessEventError {
     NotReady,
     #[error("failed to process the event")]
     Failed,
+    #[error(transparent)]
+    ResponseError(#[from] ResponseError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResponseError {
+    pub kind: ResponseErrorKind,
+    pub player: PlayerId,
+    pub response: GameEvent,
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ResponseError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResponseErrorKind {
+    InvalidGameEventKind { expected: GameEventKind },
+    InvalidAttackTarget,
+    NumberOutOfRange,
 }
 
 /// Board information
@@ -245,6 +497,117 @@ impl Board {
         };
         Ok(ret)
     }
+
+    fn draw_direct(&mut self, player: PlayerId) -> BoardChange {
+        let card = self.talon.draw().expect("talon should have some cards");
+
+        let idx = self
+            .players
+            .get_mut(&player)
+            .unwrap()
+            .insert_card_to_field(card);
+
+        BoardChange::CardMoved {
+            player,
+            movement: CardMovement::TalonToField { insert_at: idx },
+            card: card.full_view(),
+        }
+    }
+
+    fn draw(&mut self, player: PlayerId) -> Option<BoardChange> {
+        let card = self.talon.draw()?;
+
+        self.players.get_mut(&player).unwrap().insert_attacker(card);
+
+        Some(BoardChange::CardMoved {
+            player,
+            movement: CardMovement::TalonToAttacker,
+            card: card.full_view(),
+        })
+    }
+
+    fn verify_attack_target(&self, target_player: PlayerId, target_idx: u32) -> bool {
+        let Some(card) = self
+            .players
+            .get(&target_player)
+            .unwrap()
+            .field
+            .get(target_idx as usize)
+        else {
+            return false;
+        };
+
+        !card.pub_info.revealed
+    }
+
+    /// Returns `true` if guess is correct.
+    fn resolve_attack(&mut self, attacked: PlayerId, target_idx: u32, guess: CardNumber) -> bool {
+        let attacked_card = self.players.get(&attacked).unwrap().field[target_idx as usize];
+        guess == attacked_card.priv_info.number
+    }
+
+    fn resolve_succeeded_attack(&mut self, attacked: PlayerId, target_idx: u32) -> BoardChange {
+        let attacked_card = self
+            .players
+            .get_mut(&attacked)
+            .unwrap()
+            .field
+            .get_mut(target_idx as usize)
+            .unwrap();
+
+        attacked_card.pub_info.revealed = true;
+
+        BoardChange::CardRevealed {
+            player: attacked,
+            location: CardLocation::Field { idx: target_idx },
+            card: *attacked_card,
+        }
+    }
+
+    fn has_player_lost_game(&mut self, player: PlayerId) -> bool {
+        self.players
+            .get(&player)
+            .unwrap()
+            .field
+            .iter()
+            .all(|v| v.pub_info.revealed)
+    }
+
+    fn resolve_failed_attack(&mut self, attacker: PlayerId) -> [BoardChange; 2] {
+        let player = self.players.get_mut(&attacker).unwrap();
+
+        let mut attacker_card = player.attacker.take().unwrap();
+        attacker_card.pub_info.revealed = true;
+
+        let idx = player.insert_card_to_field(attacker_card);
+
+        [
+            BoardChange::CardRevealed {
+                player: attacker,
+                location: CardLocation::Attacker,
+                card: attacker_card,
+            },
+            BoardChange::CardMoved {
+                player: attacker,
+                movement: CardMovement::AttackerToField { insert_at: idx },
+                card: attacker_card.full_view(),
+            },
+        ]
+    }
+
+    fn resolve_stay(&mut self, attacker: PlayerId) -> BoardChange {
+        let player = self.players.get_mut(&attacker).unwrap();
+
+        let attacker_card = player.attacker.take().unwrap();
+
+        let idx = player.insert_card_to_field(attacker_card);
+
+        BoardChange::CardMoved {
+            player: attacker,
+            movement: CardMovement::AttackerToField { insert_at: idx },
+            card: attacker_card.full_view(),
+        }
+    }
 }
 
 /// Board information to provide to players.
@@ -271,6 +634,30 @@ impl TurnContext {
             attack: AttackContext::default(),
         }
     }
+
+    fn turn_player(&self) -> PlayerId {
+        self.turn_player.get().unwrap()
+    }
+
+    fn attack_target_player(&self) -> PlayerId {
+        self.attack.target_player.unwrap()
+    }
+
+    fn start_turn(&mut self) {
+        let attack_target = {
+            let mut players = self.turn_player.clone();
+            players.advance();
+            players.get().unwrap()
+        };
+
+        self.attack.target_player = Some(attack_target);
+    }
+
+    fn end_turn(&mut self) {
+        self.turn_player.advance();
+
+        self.attack.cleanup();
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -278,4 +665,10 @@ struct AttackContext {
     target_player: Option<PlayerId>,
     target_card_idx: Option<u32>,
     guess: Option<CardNumber>,
+}
+
+impl AttackContext {
+    fn cleanup(&mut self) {
+        *self = Self::default();
+    }
 }

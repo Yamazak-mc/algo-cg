@@ -8,46 +8,42 @@ use std::collections::VecDeque;
 /// All possible events that occur during the game.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum GameEvent {
-    /// The board is changed.
+    /// The board has been changed.
     BoardChanged(BoardChange),
-    /// The game is started.
+    /// The game has started.
     GameStarted(TalonView),
-    /// The turn order is determined.
+    /// The turn order has been determined.
     TurnOrderDetermined(Vec<PlayerId>),
-    /// The card is given out to the player.
-    DrawnCard(PlayerId),
+    /// The card is distributed to the player.
+    CardDistributed(PlayerId),
     /// The turn is given to the player.
     TurnStarted(PlayerId),
     /// The turn player has drawn a card.
-    TurnPlayerDrawnCard,
+    TurnPlayerDrewCard,
     /// No cards left to draw; the game ends in a draw.
-    OutOfCards,
-    /// The turn player must decide what to do.
-    ///
-    /// If `optional` is true, they can choose not to attack and stay.
-    /// Otherwise, they must attack.
-    RequireAttackDecision {
-        target_player: PlayerId,
-        optional: bool,
-    },
-    /// The turn player decided whether to attack or stay.
-    DecidedAttackOrStay { attack: bool },
+    NoCardsLeft,
+    /// The turn player must select a card to attack.
+    AttackTargetSelectionRequired { target_player: PlayerId },
     /// The turn player chose which card to attack to.
-    AttackTargetChosen { target_idx: u32 },
+    AttackTargetSelected { target_idx: u32 },
+    /// The turn player must guess the number.
+    NumberGuessRequired,
     /// The turn player guessed the number of the card they targeted.
-    MadeNumberGuess(CardNumber),
+    NumberGuessed(CardNumber),
     /// The turn player correctly guessed the number
     /// and the opponent flipped the targeted card.
     AttackSucceeded,
     /// The turn player guessed the number incorrectly and
     /// placed the drawn card face-up on their field.
     AttackFailed,
-    /// The player's placement has been determined.
-    PlayerPlaceDetermined {
-        player: PlayerId,
-        /// A 0-based value where smaller numbers indicate a better placement.
-        place: u8,
-    },
+    /// The player's field has no more face down cards.
+    AttackedPlayerLost,
+    /// The game is ended.
+    GameEnded,
+    /// The turn player must select where to attack or stay.
+    AttackOrStayDecisionRequired,
+    /// The turn player has decided whether to attack or stay.
+    AttackOrStayDecided { attack: bool },
     /// The turn is passed to the opponent.
     TurnEnded,
     /// OK response
@@ -59,19 +55,19 @@ impl GameEvent {
     pub(crate) fn is_decision(&self) -> bool {
         matches!(
             self,
-            Self::DecidedAttackOrStay { .. }
-                | Self::AttackTargetChosen { .. }
-                | Self::MadeNumberGuess(_)
+            Self::AttackTargetSelected { .. }
+                | Self::NumberGuessed(_)
+                | Self::AttackOrStayDecided { .. }
         )
     }
 
-    /// Returns `true` if a player's decision is required after this event.
+    /// Returns `true` if a turn player is required to respond with their decision.
     pub(crate) fn is_decision_required(&self) -> bool {
         matches!(
             self,
-            Self::RequireAttackDecision { .. }
-                | Self::DecidedAttackOrStay { .. }
-                | Self::AttackTargetChosen { .. }
+            Self::AttackTargetSelectionRequired { .. }
+                | Self::NumberGuessRequired { .. }
+                | Self::AttackOrStayDecisionRequired { .. }
         )
     }
 
@@ -83,6 +79,55 @@ impl GameEvent {
             other => other.clone(),
         }
     }
+
+    pub fn kind(&self) -> GameEventKind {
+        match self {
+            Self::BoardChanged(_) => GameEventKind::BoardChanged,
+            Self::GameStarted(_) => GameEventKind::GameStarted,
+            Self::TurnOrderDetermined(_) => GameEventKind::TurnOrderDetermined,
+            Self::CardDistributed(_) => GameEventKind::CardDistributed,
+            Self::TurnStarted(_) => GameEventKind::TurnStarted,
+            Self::TurnPlayerDrewCard => GameEventKind::TurnPlayerDrewCard,
+            Self::NoCardsLeft => GameEventKind::NoCardsLeft,
+            Self::AttackTargetSelectionRequired { .. } => {
+                GameEventKind::AttackTargetSelectionRequired
+            }
+            Self::AttackTargetSelected { .. } => GameEventKind::AttackTargetSelected,
+            Self::NumberGuessRequired => GameEventKind::NumberGuessRequired,
+            Self::NumberGuessed(_) => GameEventKind::NumberGuessed,
+            Self::AttackSucceeded => GameEventKind::AttackSucceeded,
+            Self::AttackFailed => GameEventKind::AttackFailed,
+            Self::AttackedPlayerLost => GameEventKind::AttackedPlayerLost,
+            Self::GameEnded => GameEventKind::GameEnded,
+            Self::AttackOrStayDecisionRequired => GameEventKind::AttackOrStayDecisionRequired,
+            Self::AttackOrStayDecided { .. } => GameEventKind::AttackOrStayDecided,
+            Self::TurnEnded => GameEventKind::TurnEnded,
+            Self::RespOk => GameEventKind::RespOk,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameEventKind {
+    BoardChanged,
+    GameStarted,
+    TurnOrderDetermined,
+    CardDistributed,
+    TurnStarted,
+    TurnPlayerDrewCard,
+    NoCardsLeft,
+    AttackTargetSelectionRequired,
+    AttackTargetSelected,
+    NumberGuessRequired,
+    NumberGuessed,
+    AttackSucceeded,
+    AttackFailed,
+    AttackedPlayerLost,
+    GameEnded,
+    AttackOrStayDecisionRequired,
+    AttackOrStayDecided,
+    TurnEnded,
+    RespOk,
 }
 
 /// All possible board changes.
@@ -145,12 +190,8 @@ pub enum CardMovement {
     TalonToField {
         /// The card's index from the left, viewed from the owner.
         insert_at: u32,
-        /// `None` if there's no card left.
-        new_talon_top: Option<CardView>,
     },
-    TalonToAttacker {
-        new_talon_top: Option<CardView>,
-    },
+    TalonToAttacker,
     AttackerToField {
         insert_at: u32,
     },
@@ -197,5 +238,13 @@ impl<T> EventQueue<T> {
         }
 
         self.main_queue.pop_front()
+    }
+
+    pub fn push_main(&mut self, event: T) {
+        self.main_queue.push_back(event);
+    }
+
+    pub fn push_sub(&mut self, event: T) {
+        self.sub_queue.push_back(event);
     }
 }

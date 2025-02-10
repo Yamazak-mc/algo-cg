@@ -78,11 +78,15 @@ pub struct Card {
 
 impl PartialOrd for Card {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Card {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Manually specifying the priority just in case.
-        match self.priv_info.number.partial_cmp(&other.priv_info.number) {
-            Some(std::cmp::Ordering::Equal) => {
-                self.pub_info.color.partial_cmp(&other.pub_info.color)
-            }
+        match self.priv_info.number.cmp(&other.priv_info.number) {
+            std::cmp::Ordering::Equal => self.pub_info.color.cmp(&other.pub_info.color),
             v => v,
         }
     }
@@ -102,6 +106,13 @@ impl Card {
             CardView::full(*self)
         } else {
             CardView::hidden(*self)
+        }
+    }
+
+    pub fn full_view(self) -> CardView {
+        CardView {
+            pub_info: self.pub_info,
+            priv_info: Some(self.priv_info),
         }
     }
 }

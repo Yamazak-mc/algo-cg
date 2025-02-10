@@ -2,7 +2,10 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
-use crate::card::{Card, CardView};
+use crate::{
+    card::{Card, CardView},
+    event::CardLocation,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[repr(transparent)]
@@ -31,6 +34,26 @@ impl Player {
     pub fn public_view(&self) -> PlayerView {
         let cards = self.field.iter().map(Card::public_view).collect();
         PlayerView::new(cards)
+    }
+
+    pub fn insert_card_to_field(&mut self, card: Card) -> u32 {
+        let Err(idx) = self.field.binary_search(&card) else {
+            panic!("duplicated card detected: {:?}", card);
+        };
+
+        self.field.insert(idx, card);
+
+        idx as u32
+    }
+
+    pub fn insert_attacker(&mut self, card: Card) -> CardLocation {
+        if let Some(attacker) = self.attacker.take() {
+            panic!("attacker already exists: {:?}", attacker);
+        }
+
+        self.attacker = Some(card);
+
+        CardLocation::Attacker
     }
 }
 
