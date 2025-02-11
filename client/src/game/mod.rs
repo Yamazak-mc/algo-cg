@@ -32,6 +32,8 @@ const CARD_WIDTH: f32 = CARD_SIZE.x;
 const CARD_HEIGHT: f32 = CARD_SIZE.z;
 const CARD_DEPTH: f32 = CARD_SIZE.y;
 
+const HALF_CARD_DEPTH: f32 = CARD_DEPTH / 2.0;
+
 const CARD_X_GAP_RATIO: f32 = 0.2;
 const CARD_Z_GAP_RATIO: f32 = 0.1;
 

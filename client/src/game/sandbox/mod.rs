@@ -6,7 +6,7 @@ use super::{
     },
     card_field::{CardField, CardFieldOwnedBy, MyCardField},
     dialog::{Dialog, DialogButton, PopupMessageExt as _},
-    GameMode, CARD_DEPTH, CARD_HEIGHT, CARD_Z_GAP_RATIO, TALON_TRANSLATION,
+    GameMode, CARD_HEIGHT, CARD_Z_GAP_RATIO, HALF_CARD_DEPTH, TALON_TRANSLATION,
 };
 use crate::{game::card::guessing::SpawnNumSelector, AppState};
 use algo_core::{
@@ -35,8 +35,6 @@ mod camera_control;
 use camera_control::SandboxCameraControlPlugin;
 
 const SANDBOX_CTX_STATE: GameMode = GameMode::Sandbox;
-
-const HALF_CARD_DEPTH: f32 = CARD_DEPTH / 2.0;
 
 const INITIAL_DRAW_NUM_PER_PLAYER: usize = 4;
 
