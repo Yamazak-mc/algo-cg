@@ -288,10 +288,6 @@ impl Talon {
         self.cards.len()
     }
 
-    pub fn view_top(&self) -> Option<CardView> {
-        self.cards.last().map(|v| v.public_view())
-    }
-
     pub fn shuffle(&mut self, mut rng: impl rand::Rng) {
         self.cards.shuffle(&mut rng);
     }

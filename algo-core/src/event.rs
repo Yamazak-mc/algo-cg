@@ -52,7 +52,7 @@ pub enum GameEvent {
 
 impl GameEvent {
     /// Returns `true` if the event represents a player's decision.
-    pub(crate) fn is_decision(&self) -> bool {
+    pub fn is_decision(&self) -> bool {
         matches!(
             self,
             Self::AttackTargetSelected { .. }
@@ -62,7 +62,7 @@ impl GameEvent {
     }
 
     /// Returns `true` if a turn player is required to respond with their decision.
-    pub(crate) fn is_decision_required(&self) -> bool {
+    pub fn is_decision_required(&self) -> bool {
         matches!(
             self,
             Self::AttackTargetSelectionRequired { .. }

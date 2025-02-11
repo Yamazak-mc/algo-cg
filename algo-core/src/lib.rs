@@ -9,10 +9,10 @@ pub mod settings;
 use settings::GameSettings;
 
 pub mod card;
-use card::{CardNumber, CardView, Talon};
+use card::{CardNumber, Talon};
 
 pub mod player;
-use player::{Player, PlayerId, PlayerView, TurnPlayer};
+use player::{Player, PlayerId, TurnPlayer};
 
 pub mod event;
 use event::{BoardChange, CardLocation, CardMovement, EventQueue, GameEvent, GameEventKind};
@@ -93,13 +93,6 @@ impl Game {
             history: Vec::new(),
         };
         Ok(ret)
-    }
-
-    /// Provides board information from the perspective of the specified player.
-    ///
-    /// Returns `Err` if the specified PlayerId is unknown.
-    pub fn view_board(&self, viewer: PlayerId) -> anyhow::Result<BoardView> {
-        self.board.view(viewer)
     }
 
     /// Starts processing the next [`GameEvent`].
@@ -500,30 +493,6 @@ impl Board {
         Self { talon, players }
     }
 
-    // TODO: Accept guests(non-players) as viewer somehow.
-    fn view(&self, viewer: PlayerId) -> anyhow::Result<BoardView> {
-        let myself = self
-            .players
-            .get(&viewer)
-            .context(format!("unknown PlayerId {:?}", viewer))?
-            .clone();
-
-        let other_players = self
-            .players
-            .iter()
-            .filter(|(k, _)| **k != viewer)
-            .map(|(k, v)| (*k, v.public_view()))
-            .collect();
-
-        let ret = BoardView {
-            myself,
-            other_players,
-            talon_remaining: self.talon.len() as u32,
-            talon_top: self.talon.view_top(),
-        };
-        Ok(ret)
-    }
-
     fn draw_direct(&mut self, player: PlayerId) -> BoardChange {
         let card = self.talon.draw().expect("talon should have some cards");
 
@@ -634,14 +603,6 @@ impl Board {
             card: attacker_card.full_view(),
         }
     }
-}
-
-/// Board information to provide to players.
-pub struct BoardView {
-    pub myself: Player,
-    pub other_players: BTreeMap<PlayerId, PlayerView>,
-    pub talon_remaining: u32,
-    pub talon_top: Option<CardView>,
 }
 
 #[derive(Debug, Clone, Default)]
