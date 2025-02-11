@@ -75,6 +75,11 @@ impl SetTimeout {
             return;
         };
 
+        if event.duration_secs <= 0.0 {
+            (on_timedout)(&mut commands);
+            return;
+        }
+
         let entry = storage.vacant_entry();
 
         let animator_entity = {
