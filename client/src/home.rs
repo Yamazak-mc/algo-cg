@@ -76,7 +76,8 @@ pub fn home_plugin(app: &mut App) {
         .add_systems(OnEnter(AppState::Home), setup_home)
         .add_systems(
             Update,
-            start_sandbox_conditioned.run_if(input_just_pressed(KeyCode::Enter)),
+            start_sandbox_conditioned
+                .run_if(in_state(HomeState::Menu).and(input_just_pressed(KeyCode::Enter))),
         )
         .add_systems(OnEnter(HomeState::JoiningServer), JoinedPlayers::setup)
         .add_systems(
