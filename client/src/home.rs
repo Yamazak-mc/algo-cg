@@ -124,7 +124,7 @@ pub fn home_plugin(app: &mut App) {
         .add_systems(
             OnEnter(JoiningServerState::TransitionToGame),
             |mut commands: Commands| {
-                commands.send_event(LogEvent::Debug);
+                // commands.send_event(LogEvent::Debug);
                 commands.set_state(AppState::Game);
             },
         );
