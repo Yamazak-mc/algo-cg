@@ -49,7 +49,7 @@ macro_rules! display_impl {
         {
             let msg = format!($($tt)*);
             $commands.send_event(LogEvent::Push(Message::$constructor(&msg)));
-            $log_chan!("[LogDisp]: {}", msg);
+            $log_chan!("[LogDisp] {}", msg);
         }
     };
 }
