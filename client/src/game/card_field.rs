@@ -64,7 +64,7 @@ pub struct CardPosition {
 }
 
 impl CardPosition {
-    fn idx(&self) -> u32 {
+    pub fn idx(&self) -> u32 {
         self.idx
     }
 
