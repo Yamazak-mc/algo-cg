@@ -64,6 +64,10 @@ pub struct CardPosition {
 }
 
 impl CardPosition {
+    fn idx(&self) -> u32 {
+        self.idx
+    }
+
     fn init(
         trigger: Trigger<OnAdd, Self>,
         mut commands: Commands,
