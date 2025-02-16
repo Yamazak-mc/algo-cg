@@ -1,5 +1,6 @@
 use super::{
     card::{
+        attacker::AttackTo,
         guessing::NumSelected,
         instance::{self as card_instance, CardInstance},
         picking::PickableCard,
@@ -15,9 +16,7 @@ use algo_core::{
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use client::utils::{
-    observer_controller::{
-        self, ObserveOnce, ObserverControllerPlugin, ObserverControllerSettings,
-    },
+    observer_controller::{self, ObserveOnce},
     set_timeout::SetTimeout,
     AddObserverExt as _,
 };
@@ -29,7 +28,7 @@ mod talon;
 use talon::{SandboxTalon, SpawnCards as _};
 
 mod attacker;
-use attacker::{AddAttacker, AttackTo, Attacker, AttackerSettings, SandboxAttackerPlugin};
+use attacker::{AddAttacker, Attacker, AttackerSettings, SandboxAttackerPlugin};
 
 mod camera_control;
 use camera_control::SandboxCameraControlPlugin;
@@ -77,8 +76,6 @@ enum OpponentTurnState {
 
 pub fn game_sandbox_plugin(app: &mut App) {
     app.add_plugins((
-        ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once())
-            .state_scoped(GameMode::Sandbox),
         SandboxCameraControlPlugin,
         SandboxAttackerPlugin {
             settings: AttackerSettings {

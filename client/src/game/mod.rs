@@ -2,12 +2,14 @@ use crate::AppState;
 use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 use client::utils::{
-    animate_once::AnimateOncePlugin, observer_controller::ObserverControllerPlugin,
-    set_timeout::SetTimeoutPlugin, world_to_2d::world_to_2d_plugin,
+    animate_once::AnimateOncePlugin,
+    observer_controller::{ObserverControllerPlugin, ObserverControllerSettings},
+    set_timeout::SetTimeoutPlugin,
+    world_to_2d::world_to_2d_plugin,
 };
 
 mod card;
-use card::CardPlugins;
+use card::{guessing::NumSelected, CardPlugins};
 
 mod card_field;
 use card_field::card_field_plugin;
@@ -55,11 +57,12 @@ pub fn game_plugin(app: &mut App) {
         .add_plugins((
             InfiniteGridPlugin,
             AnimateOncePlugin::from_state(AppState::Game),
-            ObserverControllerPlugin::<Pointer<Click>>::default().state_scoped(AppState::Game),
             world_to_2d_plugin,
             SetTimeoutPlugin {
                 ctx_state: CTX_STATE,
             },
+            ObserverControllerPlugin::<NumSelected>::new(ObserverControllerSettings::once())
+                .state_scoped(CTX_STATE),
             CardPlugins {
                 card_size: CARD_SIZE,
             },

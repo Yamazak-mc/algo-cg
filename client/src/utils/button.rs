@@ -1,3 +1,6 @@
+use super::component_based::{
+    interaction_based, parent_interaction_based, EnableComponentBased, EnableParentComponentBased,
+};
 use crate::utils::into_color::IntoColor;
 use bevy::prelude::*;
 use std::marker::PhantomData;
@@ -8,40 +11,18 @@ const BORDER_COLOR_ON_HOVER: [u8; 3] = [0x48, 0xCF, 0xCB];
 const BG_COLOR_DEFAULT: [u8; 3] = [0x57, 0x7B, 0xC1];
 const BG_COLOR_ON_CLICK: [u8; 3] = [0x2E, 0x4E, 0x8C];
 
+pub fn common_button_plugin(app: &mut App) {
+    app.enable_component_based::<BorderColor, Interaction>()
+        .enable_component_based::<BackgroundColor, Interaction>()
+        .enable_parent_component_based::<TextColor, Interaction>();
+}
+
 pub fn button_system<M: Component>(
     mut commands: Commands,
-    mut query: Query<
-        (
-            &Interaction,
-            &mut BackgroundColor,
-            &mut BorderColor,
-            &Children,
-        ),
-        (Changed<Interaction>, With<CommonButton<M>>),
-    >,
-    mut text_query: Query<&mut TextColor>,
+    query: Query<&Interaction, (Changed<Interaction>, With<CommonButton<M>>)>,
 ) {
-    for (interaction, mut bg_color, mut border_color, children) in &mut query {
-        let mut text_color = text_query.get_mut(children[0]).unwrap();
-        match interaction {
-            Interaction::Pressed => {
-                bg_color.0 = BG_COLOR_ON_CLICK.into_color();
-                border_color.0 = BORDER_COLOR_ON_HOVER.into_color();
-                text_color.0 = BORDER_COLOR_ON_HOVER.into_color();
-
-                commands.trigger(ButtonPressed::<M>(PhantomData));
-            }
-            Interaction::Hovered => {
-                bg_color.0 = BG_COLOR_DEFAULT.into_color();
-                border_color.0 = BORDER_COLOR_ON_HOVER.into_color();
-                text_color.0 = BORDER_COLOR_ON_HOVER.into_color();
-            }
-            Interaction::None => {
-                bg_color.0 = BG_COLOR_DEFAULT.into_color();
-                border_color.0 = BORDER_COLOR_DEFAULT.into_color();
-                text_color.0 = BORDER_COLOR_DEFAULT.into_color();
-            }
-        }
+    if query.iter().any(|v| matches!(v, Interaction::Pressed)) {
+        commands.trigger(ButtonPressed::<M>(PhantomData));
     }
 }
 
@@ -67,8 +48,18 @@ pub fn spawn_common_button<M: Component>(parent: &mut ChildBuilder, text: &str, 
                 ..default()
             },
             BorderColor(BORDER_COLOR_DEFAULT.into_color()),
-            BorderRadius::all(Val::Percent(30.0)),
+            interaction_based(
+                BorderColor(BORDER_COLOR_ON_HOVER.into_color()),
+                BORDER_COLOR_ON_HOVER.into_color().into(),
+                BORDER_COLOR_DEFAULT.into_color().into(),
+            ),
             BackgroundColor(BG_COLOR_DEFAULT.into_color()),
+            interaction_based(
+                BackgroundColor(BG_COLOR_ON_CLICK.into_color()),
+                BG_COLOR_DEFAULT.into_color().into(),
+                BG_COLOR_DEFAULT.into_color().into(),
+            ),
+            BorderRadius::all(Val::Percent(30.0)),
         ))
         .with_child((
             Text::new(text),
@@ -76,6 +67,11 @@ pub fn spawn_common_button<M: Component>(parent: &mut ChildBuilder, text: &str, 
                 font_size: 36.0,
                 ..default()
             },
-            TextColor(Color::srgb_u8(0xFF, 0xFA, 0xEC)),
+            TextColor(BORDER_COLOR_DEFAULT.into_color()),
+            parent_interaction_based(
+                TextColor(BORDER_COLOR_ON_HOVER.into_color()),
+                BORDER_COLOR_ON_HOVER.into_color().into(),
+                BORDER_COLOR_DEFAULT.into_color().into(),
+            ),
         ));
 }

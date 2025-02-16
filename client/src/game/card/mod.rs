@@ -3,6 +3,7 @@ use bevy::{
     math::Vec3,
 };
 
+pub mod attacker;
 pub mod flip_animation;
 pub mod guessing;
 pub mod instance;
@@ -29,5 +30,6 @@ impl PluginGroup for CardPlugins {
             .add(guessing::card_guessing_plugin)
             .add(flip_animation::card_flip_plugin)
             .add(name::card_name_plugin)
+            .add(attacker::attacker_plugin)
     }
 }

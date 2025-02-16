@@ -1,12 +1,19 @@
 use crate::game::CTX_STATE;
 use bevy::prelude::*;
 use bevy_mod_outline::{OutlineMode, OutlinePlugin, OutlineVolume};
-use client::utils::AddObserverExt as _;
+use client::utils::{
+    observer_controller::{self, ObserverControllerPlugin},
+    AddObserverExt as _,
+};
 
 pub fn card_picking_plugin(app: &mut App) {
-    app.add_plugins((MeshPickingPlugin, OutlinePlugin))
-        .add_state_scoped_observer_named(CTX_STATE, PickableCard::init)
-        .add_state_scoped_observer_named(CTX_STATE, PickableCard::cleanup);
+    app.add_plugins((
+        MeshPickingPlugin,
+        OutlinePlugin,
+        ObserverControllerPlugin::<Pointer<Click>>::default().state_scoped(CTX_STATE),
+    ))
+    .add_state_scoped_observer_named(CTX_STATE, PickableCard::init)
+    .add_state_scoped_observer_named(CTX_STATE, PickableCard::cleanup);
 }
 
 #[derive(Component)]
@@ -20,7 +27,8 @@ pub struct PickableCard;
 
 impl PickableCard {
     fn init(trigger: Trigger<OnAdd, Self>, mut commands: Commands, children: Query<&Children>) {
-        let child = children.get(trigger.entity()).unwrap()[0];
+        let entity = trigger.entity();
+        let child = children.get(entity).unwrap()[0];
 
         let over = commands
             .spawn(Observer::new(PickableCard__::pointer_over).with_entity(child))
@@ -32,21 +40,32 @@ impl PickableCard {
         commands
             .entity(child)
             .insert((PickableCard__, PickingObservers { over, out }));
+
+        commands.trigger_targets(
+            observer_controller::Activate::<Pointer<Click>>::new(),
+            entity,
+        );
     }
 
     fn cleanup(
         trigger: Trigger<OnRemove, Self>,
         mut commands: Commands,
-        children: Query<&Children>,
+        children_query: Query<&Children>,
         observers_query: Query<&PickingObservers>,
     ) {
-        let child = children.get(trigger.entity()).unwrap()[0];
+        let entity = trigger.entity();
+        let Ok(children) = children_query.get(entity) else {
+            return;
+        };
+        let Some(child) = children.first() else {
+            return;
+        };
 
-        if let Ok(observers) = observers_query.get(child) {
+        if let Ok(observers) = observers_query.get(*child) {
             commands.entity(observers.over).despawn();
             commands.entity(observers.out).despawn();
 
-            commands.entity(child).remove::<(
+            commands.entity(*child).remove::<(
                 PickableCard__,
                 RayCastPickable,
                 PickableCardSettings,
@@ -55,6 +74,8 @@ impl PickableCard {
                 PickingObservers,
             )>();
         }
+
+        commands.trigger_targets(observer_controller::Pause::<Pointer<Click>>::new(), entity);
     }
 }
 

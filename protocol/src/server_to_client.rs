@@ -20,6 +20,8 @@ impl ServerToClientEvent {
         matches!(self, Self::GameEvent(_))
     }
 
+    /// # Panics
+    /// Panics if `self` is not a `GameEvent`.
     pub fn into_game_event(self) -> GameEvent {
         match self {
             Self::GameEvent(game_event) => game_event,

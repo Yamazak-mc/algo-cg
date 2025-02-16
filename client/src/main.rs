@@ -6,7 +6,10 @@
 use algo_core::player::PlayerId;
 use bevy::{log::LogPlugin, prelude::*};
 use bevy_simple_text_input::TextInputPlugin;
-use client::utils::{add_observer_ext::AddObserverExtPlugin, log_display::log_display_plugin};
+use client::utils::{
+    add_observer_ext::AddObserverExtPlugin, log_display::log_display_plugin,
+    scrollable::scrollable_plugin,
+};
 
 mod game;
 mod home;
@@ -44,6 +47,7 @@ fn main() {
             TextInputPlugin,
             log_display_plugin,
             AddObserverExtPlugin,
+            scrollable_plugin,
             home::home_plugin,
             game::game_plugin,
             // DEBUG

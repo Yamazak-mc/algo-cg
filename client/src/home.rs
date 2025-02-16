@@ -11,7 +11,7 @@ use client::{
     },
     log_macros::*,
     utils::{
-        button::{button_system, spawn_common_button, ButtonPressed},
+        button::{button_system, common_button_plugin, spawn_common_button, ButtonPressed},
         into_color::IntoColor,
         log_display::{LogDisplay, LogDisplaySettings, LogEvent, Message},
         AddObserverExt as _,
@@ -66,7 +66,7 @@ const POPUP_HEIGHT_PERCENT: f32 = 60.0;
 const POPUP_BG_COLOR_RGBA: [u8; 4] = [43, 43, 43, 240];
 
 pub fn home_plugin(app: &mut App) {
-    app.add_plugins(client_connection_plugin)
+    app.add_plugins((client_connection_plugin, common_button_plugin))
         .add_sub_state::<HomeState>()
         .enable_state_scoped_entities::<HomeState>()
         .add_sub_state::<JoiningServerState>()

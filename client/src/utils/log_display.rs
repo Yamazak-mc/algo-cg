@@ -1,11 +1,14 @@
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseScrollUnit, prelude::*};
 use std::collections::VecDeque;
+
+use super::scrollable::ScrollEvent;
 
 // TODO: make LogDisplay scrollable
 
 pub fn log_display_plugin(app: &mut App) {
     app.add_event::<LogEvent>()
-        .add_systems(Update, (relay_event, handle_log_display).chain());
+        .add_systems(Update, (relay_event, handle_log_display).chain())
+        .add_observer(LogDisplay::on_add_log_display);
 }
 
 #[derive(Debug, Clone)]
@@ -27,10 +30,11 @@ impl Default for LogDisplaySettings {
 #[require(Text)]
 pub struct LogDisplay {
     settings: LogDisplaySettings,
-    _start_idx: usize,
     logs: Vec<Message>,
     events: VecDeque<LogEvent>,
     lines: Vec<Option<Entity>>,
+    scroll: usize,
+    prev_scroll: usize,
 }
 
 impl LogDisplay {
@@ -39,10 +43,11 @@ impl LogDisplay {
 
         Self {
             settings,
-            _start_idx: 0,
             logs: Vec::new(),
             events: VecDeque::new(),
             lines,
+            scroll: 0,
+            prev_scroll: 0,
         }
     }
 
@@ -85,25 +90,75 @@ impl LogDisplay {
         );
     }
 
+    fn on_add_log_display(trigger: Trigger<OnAdd, Self>, mut commands: Commands) {
+        commands.entity(trigger.entity()).observe(Self::on_scroll);
+    }
+
+    pub fn queue_scroll(&mut self, lines: i32) {
+        if lines < 0 {
+            self.scroll = self.scroll.saturating_sub(lines.unsigned_abs() as usize);
+        } else {
+            let len = self.logs.len();
+            let max_lines = self.settings.max_lines;
+            if len > max_lines {
+                self.scroll = (self.scroll + lines as usize).min(len - max_lines);
+            }
+        }
+    }
+
+    fn on_scroll(trigger: Trigger<ScrollEvent>, mut query: Query<&mut LogDisplay>) {
+        let event = trigger.event().0;
+
+        let (_dx, dy) = match event.unit {
+            MouseScrollUnit::Line => (event.x, event.y),
+            MouseScrollUnit::Pixel => {
+                warn!("unsupported MouseScrollUnit for LogDisplay: Pixel");
+                return; // TODO
+            }
+        };
+
+        query
+            .get_mut(trigger.entity())
+            .unwrap()
+            .queue_scroll(dy as i32);
+    }
+
     fn update(&mut self, self_id: Entity, world_cmds: &mut Commands) {
-        if self.events.is_empty() {
+        if self.events.is_empty() && self.scroll == self.prev_scroll {
             return;
         }
+        self.prev_scroll = self.scroll;
 
         let prev_len = self.logs.len();
-        let has_clear_cmd = self.events.front().unwrap().is_clear();
+        let has_clear_cmd = match self.events.front() {
+            Some(ev) => ev.is_clear(),
+            None => false,
+        };
 
         for log_cmd in self.events.drain(..) {
             match log_cmd {
                 LogEvent::Clear => self.logs.clear(),
-                LogEvent::Push(msg) => self.logs.push(msg),
+                LogEvent::Push(msg) => {
+                    #[cfg(not(debug_assertions))]
+                    {
+                        if msg.level == Some(MessageLevel::Debug) {
+                            continue;
+                        }
+                    }
+                    self.logs.push(msg)
+                }
                 _ => (),
             }
         }
 
         let len = self.logs.len();
         let max_lines = self.settings.max_lines;
-        let start = len.saturating_sub(max_lines);
+        let mut start = len.saturating_sub(max_lines);
+
+        if self.scroll > 0 && len > max_lines {
+            start = start.saturating_sub(self.scroll);
+        }
+
         let stop = (start + max_lines).min(len);
 
         for (msg, entity) in self.logs[start..stop].iter().zip(&mut self.lines) {
@@ -137,6 +192,7 @@ pub enum LogEvent {
     Clear,
     Push(Message),
     Debug,
+    Scroll(i32),
 }
 
 impl LogEvent {
@@ -216,6 +272,7 @@ impl Message {
             TextSpan(format!("{}\n", self.text)),
             TextColor(self.color),
             ViewVisibility::default(),
+            PickingBehavior::IGNORE,
         )
     }
 
@@ -273,6 +330,9 @@ fn relay_event(
             }
             LogEvent::Debug => {
                 log_display.debug();
+            }
+            LogEvent::Scroll(dy) => {
+                log_display.queue_scroll(*dy);
             }
         }
     }

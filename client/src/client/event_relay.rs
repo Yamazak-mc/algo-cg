@@ -43,7 +43,7 @@ impl EventRelay {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
-            debug!("entering select");
+            // debug!("entering select");
             tokio::select! {
                 _ = self.shutdown_token.cancelled() => {
                     info!("received a shutdown token");
