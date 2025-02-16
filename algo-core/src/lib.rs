@@ -226,7 +226,7 @@ impl Game {
         // Responses left in the storage are expected to be `RespOk`.
         for (pid, resp) in self.event_responses.iter_mut() {
             match resp.take() {
-                Some(GameEvent::RespOk) => {
+                Some(GameEvent::RespOk) | None => {
                     continue;
                 }
                 Some(unexpected) => {
@@ -239,7 +239,6 @@ impl Game {
                     }
                     .into());
                 }
-                None => unreachable!(),
             }
         }
 
