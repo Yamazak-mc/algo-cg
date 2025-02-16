@@ -137,10 +137,6 @@ impl SpawnNumSelector {
 #[derive(Component)]
 struct NumSelectorTarget;
 
-#[derive(Event)]
-#[allow(unused)]
-pub struct DespawnNumSelector;
-
 #[derive(Component)]
 struct NumSelectorButton {
     output: CardNumber,
