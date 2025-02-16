@@ -7,7 +7,7 @@ edition = "2021"
 algo-core = { path = "../algo-core" }
 anyhow = { workspace = true }
 argh = "0.1.13"
-bevy = { version = "0.15.1", features = ["bevy_remote"] }
+bevy = { version = "0.15.1" }
 bevy_infinite_grid = "0.14.1"
 bevy_simple_text_input = "0.10.1"
 bincode = { workspace = true }
