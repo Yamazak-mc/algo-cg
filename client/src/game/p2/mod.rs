@@ -1,6 +1,7 @@
 use super::{
     card::{
         attacker::AttackTo,
+        effects::CardPickingState,
         guessing::NumSelected,
         instance::{self as card_instance, CardInstance},
     },
@@ -9,7 +10,7 @@ use super::{
 };
 use crate::{
     game::{
-        card::{guessing::SpawnNumSelector, picking::PickableCard},
+        card::guessing::SpawnNumSelector,
         card_field::CardFieldOwnedBy,
         CARD_HEIGHT, CARD_Z_GAP_RATIO,
     },
@@ -383,7 +384,9 @@ impl AttackTargetSelectionRequired {
             .iter()
             .filter(|e| !cards.get(**e).unwrap().get().pub_info.revealed)
         {
-            commands.entity(*attack_target).insert(PickableCard);
+            commands
+                .entity(*attack_target)
+                .insert(CardPickingState::Pickable);
         }
     }
 }
@@ -392,16 +395,15 @@ fn on_click_attack_target(
     trigger: Trigger<Pointer<Click>>,
     query: Query<&CardPosition>,
     mut ev_handler: GameEvHandler,
-    pickable_cards: Query<Entity, With<PickableCard>>,
-    mut commands: Commands,
+    mut card_picking_states: Query<&mut CardPickingState>,
 ) {
     let entity = trigger.entity();
     let target_idx = query.get(entity).unwrap().idx();
 
     ev_handler.send_game_ev(GameEvent::AttackTargetSelected { target_idx });
 
-    for entity in &pickable_cards {
-        commands.entity(entity).remove::<PickableCard>();
+    for mut state in &mut card_picking_states {
+        state.set_if_neq(CardPickingState::None);
     }
 }
 

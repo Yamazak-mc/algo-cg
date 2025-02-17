@@ -4,6 +4,7 @@ use bevy::{
 };
 
 pub mod attacker;
+pub mod effects;
 pub mod flip_animation;
 pub mod guessing;
 pub mod instance;
@@ -31,5 +32,6 @@ impl PluginGroup for CardPlugins {
             .add(flip_animation::card_flip_plugin)
             .add(name::card_name_plugin)
             .add(attacker::attacker_plugin)
+            .add(effects::card_effect_plugin)
     }
 }

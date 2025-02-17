@@ -1,4 +1,5 @@
 use super::{
+    effects::CardEffectState,
     flip_animation::FlipCard,
     material::CardMaterials,
     mesh::CardMesh,
@@ -21,6 +22,7 @@ pub fn card_instance_plugin(app: &mut App) {
 
 /// The main card component.
 #[derive(Debug, Component)]
+#[require(CardEffectState)]
 pub struct CardInstance(CardView);
 
 impl CardInstance {
