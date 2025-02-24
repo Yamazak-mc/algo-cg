@@ -95,7 +95,13 @@ fn setup_game(mut commands: Commands) {
     commands.spawn((
         StateScoped(CTX_STATE),
         InfiniteGridBundle {
+            #[cfg(feature = "dev")]
             settings: InfiniteGridSettings { ..default() },
+            #[cfg(not(feature = "dev"))]
+            settings: InfiniteGridSettings {
+                x_axis_color: Color::srgb(0.25, 0.25, 0.25),
+                z_axis_color: Color::srgb(0.25, 0.25, 0.25),
+            },
             ..default()
         },
         Name::new("InfiniteGrid"),

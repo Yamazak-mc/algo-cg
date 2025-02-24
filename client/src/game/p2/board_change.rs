@@ -89,6 +89,11 @@ impl ApplyBoardChange {
             ));
 
         commands.trigger_targets(insert_observer_controller(), card_entity);
+
+        commands.trigger(PushHistory::Draw(CardSnapshotBuilder {
+            mention_target: Some(card_entity),
+            card,
+        }));
     }
 
     fn attacker_to_field(
@@ -96,6 +101,7 @@ impl ApplyBoardChange {
         attacker: Option<Single<Entity, With<Attacker>>>,
         mut commands: Commands,
         mut fields: Query<(Entity, &CardFieldOwnedBy, &mut CardField)>,
+        cards: Query<&CardInstance>,
     ) {
         let BoardChange::CardMoved {
             player,
@@ -114,6 +120,10 @@ impl ApplyBoardChange {
         let attacker = *attacker.unwrap();
         field.insert_card(field_entity, insert_at, attacker, &mut commands);
         commands.entity(attacker).remove::<Attacker>();
+
+        commands.trigger(PushHistory::AttackerInsertedToField(
+            CardSnapshotBuilder::from_entity_with_query(attacker, &cards),
+        ));
     }
 
     fn reveal_attacker(
@@ -137,6 +147,11 @@ impl ApplyBoardChange {
         } else {
             commands.trigger_targets(card_instance::RevealWith(card.priv_info), card_entity);
         }
+
+        commands.trigger(PushHistory::CardRevealed(CardSnapshotBuilder {
+            mention_target: Some(card_entity),
+            card: card.full_view(),
+        }));
     }
 
     fn reveal_field_card(
@@ -167,6 +182,11 @@ impl ApplyBoardChange {
         } else {
             commands.trigger_targets(card_instance::RevealWith(card.priv_info), card_entity);
         }
+
+        commands.trigger(PushHistory::CardRevealed(CardSnapshotBuilder {
+            mention_target: Some(card_entity),
+            card: card.full_view(),
+        }));
     }
 }
 

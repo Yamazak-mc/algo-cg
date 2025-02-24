@@ -18,6 +18,8 @@ macro_rules! impl_pointer_observer {
     };
 }
 
+pub const MENTION_OUTLINE_COLOR: Color = Color::srgb(1.0, 0.494, 0.886);
+
 const OUTLINE_MODE: OutlineMode = OutlineMode::ExtrudeFlat;
 
 pub fn card_effect_plugin(app: &mut App) {
@@ -229,10 +231,11 @@ impl CardEffectState {
     }
 
     fn outline_color(&self) -> LinearRgba {
+        // This is ugly
         let (r, g, b) = match self {
             Self::None => return LinearRgba::NONE,
             Self::Pickable => (1.0, 1.0, 0.0),
-            Self::Mentioned => (0.0, 0.0, 1.0),
+            Self::Mentioned => return MENTION_OUTLINE_COLOR.to_linear(),
             Self::Hovered => (0.0, 1.0, 1.0),
         };
         LinearRgba::rgb(r, g, b)

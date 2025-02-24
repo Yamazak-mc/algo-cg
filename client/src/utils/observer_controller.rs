@@ -190,7 +190,9 @@ where
     fn remove(trigger: Trigger<Remove<E, B>>, mut query: Query<&mut Self>, mut commands: Commands) {
         let entity = trigger.entity();
         let Ok(mut this) = query.get_mut(entity) else {
-            warn!("`remove` is triggered but the corresponding ObserverController is not found");
+            warn_once!(
+                "`remove` is triggered but the corresponding ObserverController is not found"
+            );
             return;
         };
 
@@ -212,7 +214,9 @@ where
     ) {
         let entity = trigger.entity();
         let Ok(mut this) = query.get_mut(entity) else {
-            warn!("`activate` is triggered but the corresponding ObserverController is not found");
+            warn_once!(
+                "`activate` is triggered but the corresponding ObserverController is not found"
+            );
             return;
         };
 
@@ -231,7 +235,9 @@ where
     fn pause(trigger: Trigger<Pause<E, B>>, mut query: Query<&mut Self>, mut commands: Commands) {
         let entity = trigger.entity();
         let Ok(mut this) = query.get_mut(entity) else {
-            warn!("`pause` is triggered but the corresponding ObserverController is not found");
+            warn_once!(
+                "`pause` is triggered but the corresponding ObserverController is not found"
+            );
             return;
         };
 

@@ -10,9 +10,8 @@ use super::{
 };
 use crate::{
     game::{
-        card::guessing::SpawnNumSelector,
-        card_field::CardFieldOwnedBy,
-        CARD_HEIGHT, CARD_Z_GAP_RATIO,
+        card::guessing::SpawnNumSelector, card_field::CardFieldOwnedBy, CARD_HEIGHT,
+        CARD_Z_GAP_RATIO,
     },
     AppState, JoinedPlayers,
 };
@@ -42,7 +41,10 @@ mod response;
 use response::{GameEvHandler, Resp};
 
 mod ui;
-use ui::popup::{QuestionAnswered, SpawnPopupMessage, SpawnQuestion};
+use ui::{
+    history::{CardSnapshotBuilder, HistoryBgColor, PushHistory},
+    popup::{QuestionAnswered, SpawnPopupMessage, SpawnQuestion},
+};
 
 const P2_CTX_STATE: GameMode = GameMode::TwoPlayers;
 
@@ -78,7 +80,7 @@ struct TalonCardIndex(u32);
 #[derive(Component, Reflect)]
 struct TalonTopCardIndex(u32);
 
-#[derive(Clone, Component)]
+#[derive(Clone, Default, Component)]
 struct TurnPlayer(Option<PlayerId>);
 
 #[derive(Component)]
@@ -87,11 +89,17 @@ struct MyTurn;
 #[derive(Component)]
 struct Attacker;
 
-#[derive(Component)]
+#[derive(Default, Component)]
 struct AttackTargetPlayer(Option<PlayerId>);
 
-#[derive(Component)]
+#[derive(Default, Component)]
 struct AttackTargetCard(Option<Entity>);
+
+#[derive(Default, PartialEq, Eq, Component)]
+struct FirstTurnStarted(bool);
+
+#[derive(Default, Component)]
+struct CardDistributionCount(u8);
 
 pub fn p2_plugin(app: &mut App) {
     app.add_plugins((ui::ui_plugin, response::response_plugin))
@@ -146,18 +154,28 @@ fn setup(mut commands: Commands, joined_players: ResMut<JoinedPlayers>) {
 
     commands.spawn((
         StateScoped(P2_CTX_STATE),
-        TurnPlayer(None),
+        TurnPlayer::default(),
         Name::new("Tracker.TurnPlayer"),
     ));
     commands.spawn((
         StateScoped(P2_CTX_STATE),
-        AttackTargetPlayer(None),
+        AttackTargetPlayer::default(),
         Name::new("Tracker.AttackTargetPlayer"),
     ));
     commands.spawn((
         StateScoped(P2_CTX_STATE),
-        AttackTargetCard(None),
+        AttackTargetCard::default(),
         Name::new("Tracker.AttackTargetCard"),
+    ));
+    commands.spawn((
+        StateScoped(P2_CTX_STATE),
+        FirstTurnStarted::default(),
+        Name::new("Tracker.FirstTurnStarted"),
+    ));
+    commands.spawn((
+        StateScoped(P2_CTX_STATE),
+        CardDistributionCount::default(),
+        Name::new("CardDistributionCount"),
     ));
 }
 
@@ -205,6 +223,7 @@ fn recv_game_event(
     mut commands: Commands,
     mut ev_handler: GameEvHandler,
     mut state: ResMut<NextState<P2State>>,
+    mut counter: Single<&mut CardDistributionCount>,
 ) {
     let Some(ev) = ev_handler.recv_game_ev() else {
         return;
@@ -215,7 +234,19 @@ fn recv_game_event(
     match &ev {
         GameEvent::BoardChanged(board_change) => {
             commands.trigger(ApplyBoardChange(*board_change));
-            delay += 0.5;
+
+            delay += if matches!(
+                board_change,
+                BoardChange::CardMoved {
+                    movement: CardMovement::TalonToField { .. },
+                    ..
+                }
+            ) && counter.0 < (4 * 2)
+            {
+                0.25
+            } else {
+                0.5
+            };
         }
         GameEvent::GameStarted(talon_view) => {
             commands.spawn((
@@ -225,9 +256,18 @@ fn recv_game_event(
             ));
 
             state.set(P2State::SetupTalon);
+
+            commands.trigger(SpawnPopupMessage {
+                duration_secs: 1.0,
+                message: "Game Start!".into(),
+            });
+
+            delay += 1.0;
         }
         GameEvent::TurnOrderDetermined(_) => (),
-        GameEvent::CardDistributed(_) => (),
+        GameEvent::CardDistributed(_) => {
+            counter.0 += 1;
+        }
         GameEvent::TurnStarted(pid) => commands.trigger(TurnStarted(*pid)),
         GameEvent::TurnPlayerDrewCard => (),
         GameEvent::NoCardsLeft => (),
@@ -252,6 +292,8 @@ fn recv_game_event(
                 duration_secs: 0.5,
                 message,
             });
+            commands.trigger(PushHistory::NumberGuessed(*num));
+
             delay += 0.5;
         }
         GameEvent::AttackSucceeded => {
@@ -328,12 +370,19 @@ impl TurnStarted {
         mut commands: Commands,
         mut query: Single<(Entity, &mut TurnPlayer)>,
         my_player_field: Single<&CardFieldOwnedBy, With<MyCardField>>,
+        mut first_turn_done: Single<&mut FirstTurnStarted>,
+        fields: Query<&CardField>,
+        cards: Query<&CardInstance>,
     ) {
         let (storage_entity, ref mut turn_player) = *query;
+
+        // Update turn player info
         let turn_player_id = trigger.0;
         turn_player.0 = Some(turn_player_id);
+        let is_my_turn = turn_player_id == my_player_field.0;
 
-        let message = if turn_player_id == my_player_field.0 {
+        // Popup message
+        let message = if is_my_turn {
             commands.entity(storage_entity).insert(MyTurn);
             "Your turn!"
         } else {
@@ -345,6 +394,26 @@ impl TurnStarted {
             message: message.into(),
             ..default()
         });
+
+        // Update history
+        if first_turn_done.set_if_neq(FirstTurnStarted(true)) {
+            for field in &fields {
+                let initial_cards = field
+                    .cards()
+                    .iter()
+                    .map(|e| CardSnapshotBuilder {
+                        mention_target: Some(*e),
+                        card: *cards.get(*e).unwrap().get(),
+                    })
+                    .collect();
+
+                commands.trigger(PushHistory::InitialCards(initial_cards));
+            }
+        }
+        commands.trigger(PushHistory::TurnStarted {
+            message: message.into(),
+            color: HistoryBgColor::from_bool(is_my_turn),
+        })
     }
 }
 
@@ -420,6 +489,7 @@ impl AttackTargetSelected {
         mut attack_target_card: Single<&mut AttackTargetCard>,
         attacker: Single<Entity, With<Attacker>>,
         mut commands: Commands,
+        card_query: Query<&CardInstance>,
     ) {
         let attack_target_player = attack_target_player.0.unwrap();
         let (field, _) = fields
@@ -436,6 +506,10 @@ impl AttackTargetSelected {
             },
             *attacker,
         );
+
+        commands.trigger(PushHistory::AttackTargetSelected {
+            target: CardSnapshotBuilder::from_entity_with_query(entity, &card_query),
+        });
     }
 }
 
@@ -486,6 +560,12 @@ impl InformAttackResult {
         commands.trigger(SpawnPopupMessage {
             duration_secs: 0.5,
             message,
+        });
+
+        commands.trigger(if trigger.succeeded {
+            PushHistory::AttackSucceeded
+        } else {
+            PushHistory::AttackFailed
         });
     }
 }

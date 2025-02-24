@@ -3,11 +3,19 @@ name = "client"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["dev"]
+dev = [
+    # Improve compile times for dev builds by linking Bevy as a dynamic library.
+    "bevy/dynamic_linking",
+    "bevy/bevy_dev_tools",
+]
+
 [dependencies]
 algo-core = { path = "../algo-core" }
 anyhow = { workspace = true }
 argh = "0.1.13"
-bevy = { version = "0.15.1", features=["ghost_nodes"] }
+bevy = { version = "0.15.1", features = ["ghost_nodes"] }
 bevy_infinite_grid = "0.14.1"
 bevy_simple_text_input = "0.10.1"
 bincode = { workspace = true }
@@ -22,7 +30,6 @@ tokio = { workspace = true }
 tokio-util = { version = "0.7.13", features = ["full"] }
 
 # for sandbox, debugging
-bevy_dev_tools = "0.15.1"
 bevy-inspector-egui = "0.29.1"
 # bevy_remote_inspector = "0.1.0"
 rand = { workspace = true }

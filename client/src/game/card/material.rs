@@ -39,7 +39,10 @@ fn setup_resource(mut commands: Commands, font_assets: ResMut<Assets<Font>>) {
 pub struct CardMaterials {
     font: fontdue::Font,
     font_size: f32,
-    handles: BTreeMap<(CardColor, Option<CardNumber>), Handle<StandardMaterial>>,
+    handles: BTreeMap<
+        (CardColor, Option<CardNumber>),
+        (Handle<StandardMaterial>, Option<Handle<Image>>),
+    >,
 }
 
 impl CardMaterials {
@@ -59,7 +62,7 @@ impl CardMaterials {
         materials: &mut Assets<StandardMaterial>,
     ) -> Handle<StandardMaterial> {
         if let Some(handle) = self.handles.get(&(color, number)) {
-            return handle.clone();
+            return handle.0.clone();
         }
 
         // Create a new material
@@ -71,17 +74,30 @@ impl CardMaterials {
             bevy::color::Color::WHITE
         };
 
+        let img_handle = img.map(|v| images.add(v));
+
         let handle = materials.add(StandardMaterial {
             base_color,
-            base_color_texture: img.map(|v| images.add(v)),
+            base_color_texture: img_handle.clone(),
             perceptual_roughness: 0.8,
             metallic: 1.0,
             ..Default::default()
         });
 
         let ret = handle.clone();
-        self.handles.insert((color, number), handle);
+        self.handles.insert((color, number), (handle, img_handle));
         ret
+    }
+
+    pub fn get_or_create_card_image(
+        &mut self,
+        color: CardColor,
+        number: Option<CardNumber>,
+        images: &mut Assets<Image>,
+        materials: &mut Assets<StandardMaterial>,
+    ) -> Option<Handle<Image>> {
+        self.get_or_create_card_material(color, number, images, materials);
+        self.handles.get(&(color, number)).unwrap().1.clone()
     }
 
     // FIXME: Number 88 exceeds `CARD_WIDTH`.

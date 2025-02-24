@@ -104,11 +104,13 @@ impl CardPosition {
 
         card_pos.sync_idx_for_insertion(trigger.idx);
 
-        // The card is already inserted to the field, no need to modify its rotation.
         let new_translation = calculate_card_translation(*origin_xf, card_pos.idx, card_pos.len);
-        let animation = AnimateOnce::translation(
-            xf.translation,
-            new_translation,
+        let animation = AnimateOnce::translation_and_rotation(
+            *xf,
+            Transform {
+                translation: new_translation,
+                ..*origin_xf
+            },
             CARD_INSERTION_ANIMATION_SECS,
             EaseFunction::QuarticOut,
         );

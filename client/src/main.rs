@@ -13,6 +13,8 @@ use client::utils::{
 
 mod game;
 mod home;
+
+#[cfg(feature = "dev")]
 mod inspector;
 
 /// Arguments for launching client app.
@@ -41,7 +43,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(LogPlugin {
-                filter: "protocol=info,client=debug,wgpu=error,naga=warn".into(),
+                filter: "client=debug,wgpu=error".into(),
                 ..default()
             }),
             TextInputPlugin,
@@ -50,7 +52,7 @@ fn main() {
             scrollable_plugin,
             home::home_plugin,
             game::game_plugin,
-            // DEBUG
+            #[cfg(feature = "dev")]
             inspector::inspector_plugin,
         ))
         .insert_resource(args)
