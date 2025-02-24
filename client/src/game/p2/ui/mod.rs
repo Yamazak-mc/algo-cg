@@ -14,7 +14,7 @@ pub mod popup;
 use popup::PopupUiAnchor;
 
 pub mod history;
-use history::{CardSnapshot, HistoryUiAnchor};
+use history::HistoryUiAnchor;
 
 const ICON_NOTES: &str = "tabler-icons/notes.png";
 const ICON_NOTES_OFF: &str = "tabler-icons/notes-off.png";
